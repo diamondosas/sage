@@ -1,0 +1,41 @@
+name: Build macOS Binaries
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: macOS (Apple Silicon & Intel)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      # CHANGE HERE: Add codesigning step if distributing signed macOS binaries
+      - name: Build macOS Apple Silicon (arm64)
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: 0
+        run: go build -ldflags="-s -w" -v -o dist/sage-darwin-arm64 ./cmd/sage
+
+      - name: Build macOS Intel (amd64)
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: go build -ldflags="-s -w" -v -o dist/sage-darwin-amd64 ./cmd/sage
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sage-macos
+          path: dist/

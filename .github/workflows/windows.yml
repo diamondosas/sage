@@ -1,0 +1,41 @@
+name: Build Windows Binaries
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows (amd64 & arm64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      # CHANGE HERE: Set custom flags or output naming
+      - name: Build Windows amd64
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: go build -ldflags="-s -w" -v -o dist/sage-windows-amd64.exe ./cmd/sage
+
+      - name: Build Windows arm64
+        env:
+          GOOS: windows
+          GOARCH: arm64
+          CGO_ENABLED: 0
+        run: go build -ldflags="-s -w" -v -o dist/sage-windows-arm64.exe ./cmd/sage
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sage-windows
+          path: dist/

@@ -1,0 +1,29 @@
+{
+  "name": "sage-brain",
+  "version": "1.0.0",
+  "description": "Git-native repository knowledge brain and AI agent skill installer",
+  "main": "bin/sage-cli.js",
+  "bin": {
+    "sage": "./bin/sage-cli.js"
+  },
+  "scripts": {
+    "setup": "node ./installer/setup.js",
+    "postinstall": "node ./installer/setup.js"
+  },
+  "keywords": [
+    "sage",
+    "skills",
+    "ai-agents",
+    "git",
+    "knowledge-graph",
+    "badgerdb",
+    "cursor",
+    "claude-code",
+    "antigravity"
+  ],
+  "author": "Sage",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

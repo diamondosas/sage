@@ -1,0 +1,54 @@
+name: 'Sage Graph Sync'
+description: 'Autonomous Git and GitHub decision graph sync powered by FalkorDB'
+author: 'Sage'
+branding:
+  icon: 'cpu'
+  color: 'purple'
+
+inputs:
+  github_token:
+    description: 'GitHub token for fetching PR discussions and linked issues'
+    required: false
+    default: ${{ github.token }}
+  falkordb_host:
+    description: 'FalkorDB host'
+    required: false
+    default: '127.0.0.1'
+  falkordb_port:
+    description: 'FalkorDB port'
+    required: false
+    default: '6379'
+  falkordb_graph:
+    description: 'Target graph name in FalkorDB'
+    required: false
+    default: 'sage'
+  llm_api_key:
+    description: 'API key for Gemini or OpenAI decision summarization (optional)'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Sage
+      shell: bash
+      run: |
+        if command -v sage >/dev/null 2>&1; then
+          echo "Sage already available on PATH"
+        elif [ -f "./install/install.sh" ]; then
+          bash ./install/install.sh
+        else
+          curl -fsSL https://raw.githubusercontent.com/your-org/sage/main/install/install.sh | bash
+        fi
+
+    - name: Run Sage Sync
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        FALKORDB_HOST: ${{ inputs.falkordb_host }}
+        FALKORDB_PORT: ${{ inputs.falkordb_port }}
+        FALKORDB_GRAPH: ${{ inputs.falkordb_graph }}
+        GEMINI_API_KEY: ${{ inputs.llm_api_key }}
+        GROQ_API_KEY: ${{ inputs.llm_api_key }}
+        OPENAI_API_KEY: ${{ inputs.llm_api_key }}
+      run: |
+        sage sync

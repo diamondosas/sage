@@ -1,0 +1,26 @@
+# Binaries
+/sage
+/sage.exe
+*.bin
+bin/*
+!bin/sage-cli.js
+dist/
+
+# Local Sage database & cache
+.sage/db/
+.sage/*.lock
+.sage/*.log
+
+# Environment & Secrets
+.env
+*.key
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+prompt.txt
+PLAN.md
+SETUP.md
