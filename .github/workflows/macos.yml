@@ -24,14 +24,14 @@ jobs:
         env:
           GOOS: darwin
           GOARCH: arm64
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: go build -ldflags="-s -w" -v -o dist/sage-darwin-arm64 ./cmd/sage
 
       - name: Build macOS Intel (amd64)
         env:
           GOOS: darwin
           GOARCH: amd64
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: go build -ldflags="-s -w" -v -o dist/sage-darwin-amd64 ./cmd/sage
 
       - name: Upload macOS Artifacts

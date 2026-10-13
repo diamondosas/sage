@@ -41,31 +41,7 @@ func (e *Extractor) GetHeadSHA() (string, error) {
 
 // ExtractCommits reads recent commit history via standard git log.
 func (e *Extractor) ExtractCommits() ([]Commit, error) {
-	// Format: SHA|AuthorName|AuthorEmail|Date(ISO)|Subject
-	// Followed by list of changed files
-	// CHANGE HERE: Modify format or add "-M" to detect renames
-	args := []string{
-		"log",
-		"--name-only",
-		"--pretty=format:COMMIT_START%n%H|%an|%ae|%aI|%s",
-	}
-	if e.MaxCommits > 0 {
-		args = append(args, "-n", strconv.Itoa(e.MaxCommits))
-	}
-
-	cmd := exec.Command("git", args...)
-	cmd.Dir = e.RepoPath
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		outStr := string(output)
-		// Return empty list gracefully if repository has no commits yet
-		if strings.Contains(outStr, "does not have any commits yet") {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("git log error: %w (%s)", err, strings.TrimSpace(outStr))
-	}
-
-	return parseGitLogOutput(output)
+	return e.runGitLog()
 }
 
 // ExtractCommitsSince extracts commits between sinceSHA and HEAD incrementally.
@@ -83,19 +59,30 @@ func (e *Extractor) ExtractCommitsSince(sinceSHA string) ([]Commit, error) {
 		return e.ExtractCommits()
 	}
 
-	revisionRange := fmt.Sprintf("%s..HEAD", sinceSHA)
+	return e.runGitLog(fmt.Sprintf("%s..HEAD", sinceSHA))
+}
+
+func (e *Extractor) runGitLog(extraArgs ...string) ([]Commit, error) {
 	args := []string{
 		"log",
 		"--name-only",
 		"--pretty=format:COMMIT_START%n%H|%an|%ae|%aI|%s",
-		revisionRange,
+	}
+	args = append(args, extraArgs...)
+	if e.MaxCommits > 0 {
+		args = append(args, "-n", strconv.Itoa(e.MaxCommits))
 	}
 
 	cmd := exec.Command("git", args...)
 	cmd.Dir = e.RepoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("git log incremental error: %w (%s)", err, strings.TrimSpace(string(output)))
+		outStr := string(output)
+		// Return empty list gracefully if repository has no commits yet
+		if strings.Contains(outStr, "does not have any commits yet") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("git log error: %w (%s)", err, strings.TrimSpace(outStr))
 	}
 
 	return parseGitLogOutput(output)
@@ -132,10 +119,10 @@ func (e *Extractor) GetChangedFilesSince(sinceSHA string) ([]string, []string, e
 		if line == "" {
 			continue
 		}
-		parts := strings.Fields(line)
+		parts := strings.Split(line, "\t")
 		if len(parts) >= 2 {
-			status := parts[0]
-			path := parts[len(parts)-1] // Support rename syntax R100 old new
+			status := strings.TrimSpace(parts[0])
+			path := strings.TrimSpace(parts[len(parts)-1]) // Support rename syntax R100 old new
 			if strings.HasPrefix(status, "D") {
 				deleted = append(deleted, path)
 			} else {
@@ -186,7 +173,7 @@ func parseGitLogOutput(output []byte) ([]Commit, error) {
 		}
 
 		if current != nil && current.SHA == "" {
-			parts := strings.Split(line, "|")
+			parts := strings.SplitN(line, "|", 5)
 			if len(parts) >= 5 {
 				current.SHA = parts[0]
 				current.AuthorName = parts[1]

@@ -25,8 +25,6 @@ Welcome to the Sage support center! We are dedicated to ensuring a seamless expe
 curl -fsSL https://raw.githubusercontent.com/diamondosas/sage/main/install/install.sh | bash
 ```
 
-#### Issue: BadgerDB file lock contention
-**Solution:** BadgerDB requires single-process exclusive write access. Ensure multiple concurrent sync jobs do not access `.github/sage` simultaneously.
 
 #### Issue: Rate limiting on GitHub PR sync
 **Solution:** Provide a `GITHUB_TOKEN` input in your workflow so Sage can utilize authenticated GitHub API rate limits (5,000 requests/hour vs 60 unauthenticated).

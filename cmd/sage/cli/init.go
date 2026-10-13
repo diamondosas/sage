@@ -26,7 +26,7 @@ on:
     types: [ closed ]
   workflow_dispatch:
 
-# Permissions required for reading PRs and persisting the BadgerDB knowledge base
+# Permissions required for reading PRs and persisting the SQLite knowledge base
 permissions:
   contents: write
   pull-requests: read
@@ -60,7 +60,7 @@ jobs:
         run: |
           sage sync
 
-      # CHANGE HERE: Persist updated BadgerDB knowledge graph into the repository
+      # CHANGE HERE: Persist updated SQLite knowledge base into the repository
       - name: Commit & Push Updated Graph
         run: |
           git config --local user.email "action@github.com"
@@ -120,11 +120,11 @@ var initCmd = &cobra.Command{
 		// 4. Generate AGENTS.md instructions for Cursor / Claude Code / Antigravity
 		agentsContent := `# Sage Agent Instructions
 
-This repository is indexed by Sage (BadgerDB). When working in this codebase:
+This repository is indexed by Sage (SQLite: ` + "`" + `.github/sage/sage.db` + "`" + `). When working in this codebase:
 - Run 'sage who <file>' to find formal owners and top recent expert contributors.
-- Run 'sage why <target>' to trace why code, dependencies, or patterns exist.
-- Run 'sage overview' to see high-level repository graph statistics.
-- Run 'sage query "<prefix>"' to inspect raw stored graph keys.
+- Run 'sage why <target>' to trace why code, dependencies, or decisions exist.
+- Run 'sage overview' to see high-level repository knowledge statistics.
+- Run 'sage query "<sql_or_search>"' to query or inspect stored records.
 `
 		if _, err := os.Stat("AGENTS.md"); err == nil && !initForce {
 			fmt.Println("ℹ  AGENTS.md already exists (use --force to overwrite).")
@@ -136,7 +136,7 @@ This repository is indexed by Sage (BadgerDB). When working in this codebase:
 		}
 
 		fmt.Printf("✓ Initialized Sage repository context in ./%s/\n", cfg.SageDir)
-		fmt.Println("\nNext step: Run 'sage sync' to index Git history into local BadgerDB.")
+		fmt.Println("\nNext step: Run 'sage sync' to index Git history into local SQLite (sage.db).")
 		return nil
 	},
 }

@@ -16,8 +16,11 @@ var setupCmd = &cobra.Command{
 	Short: "Install Sage skill into AI coding assistants (Cursor, Claude, Antigravity)",
 	Long:  "Discovers installed AI coding agents and installs the Sage SKILL.md into their respective configuration folders.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// If Node.js is present and installer/setup.js exists, delegate to installer/setup.js
-		setupScript := filepath.Join("installer", "setup.js")
+		// If Node.js is present and install/install.js exists, delegate to install/install.js
+		setupScript := filepath.Join("install", "install.js")
+		if _, err := os.Stat(setupScript); os.IsNotExist(err) {
+			setupScript = filepath.Join("installer", "setup.js")
+		}
 		if _, err := os.Stat(setupScript); err == nil {
 			nodeCmd := exec.Command("node", setupScript)
 			nodeCmd.Stdout = os.Stdout

@@ -1,6 +1,6 @@
 name: 'Sage Graph Sync'
 # CHANGE HERE: Short tagline shown in GitHub Marketplace search (< 160 chars)
-description: 'Autonomous Git and GitHub decision graph sync powered by embedded BadgerDB'
+description: 'Autonomous Git and GitHub decision graph sync powered by embedded Sqlite'
 # CHANGE HERE: Publisher or author name shown on GitHub Marketplace
 author: 'diamondosas'
 

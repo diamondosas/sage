@@ -2,13 +2,10 @@
   "name": "sage-brain",
   "version": "1.0.0",
   "description": "Git-native repository knowledge brain and AI agent skill installer",
-  "main": "bin/sage-cli.js",
-  "bin": {
-    "sage": "./bin/sage-cli.js"
-  },
+  "main": "install/install.js",
   "scripts": {
-    "setup": "node ./install/setup.js",
-    "postinstall": "node ./install/setup.js"
+    "setup": "node ./install/install.js",
+    "postinstall": "node ./install/install.js"
   },
   "keywords": [
     "sage",
@@ -16,7 +13,6 @@
     "ai-agents",
     "git",
     "knowledge-graph",
-    "badgerdb",
     "cursor",
     "claude-code",
     "antigravity"

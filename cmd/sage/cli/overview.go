@@ -9,8 +9,8 @@ import (
 
 var overviewCmd = &cobra.Command{
 	Use:   "overview",
-	Short: "Display compact repository graph statistics",
-	Long:  "Queries high-level node counts from git.lddb and sage.lddb without bloating AI context windows.",
+	Short: "Display compact repository knowledge statistics",
+	Long:  "Queries high-level counts from the SQLite knowledge store (.github/sage/sage.db) without bloating AI context windows.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		engine, err := getEngine()
 		if err != nil {
@@ -39,20 +39,20 @@ var overviewCmd = &cobra.Command{
 			mindSHA = "Not synced"
 		}
 
-		fmt.Println("\n📊 Sage Knowledge Graph Overview:")
-		fmt.Println(strings.Repeat("═", 45))
-		fmt.Println("📦 Git History Graph (.github/sage/git.lddb):")
+		fmt.Println("\n📊 Sage Knowledge Overview (.github/sage/sage.db):")
+		fmt.Println(strings.Repeat("═", 50))
+		fmt.Println("📦 Git History Knowledge:")
 		fmt.Printf("  • Commits Tracked      : %d\n", dual.GitCommits)
 		fmt.Printf("  • Active Contributors  : %d\n", dual.GitPeople)
 		fmt.Printf("  • Touched Files        : %d\n", dual.GitFiles)
 		fmt.Printf("  • Last Synced Commit   : %s\n", gitSHA)
 
-		fmt.Println("\n🧠 AI Mind Graph (.github/sage/sage.lddb):")
+		fmt.Println("\n🧠 AI Mind Knowledge:")
 		fmt.Printf("  • Files Analyzed by AI : %d\n", dual.MindFiles)
 		fmt.Printf("  • Architectural Roles  : %d\n", dual.MindRoles)
 		fmt.Printf("  • Synthesized Decisions: %d\n", dual.MindDecisions)
 		fmt.Printf("  • Last Synced Commit   : %s\n", mindSHA)
-		fmt.Println(strings.Repeat("─", 45))
+		fmt.Println(strings.Repeat("─", 50))
 		fmt.Println()
 		return nil
 	},

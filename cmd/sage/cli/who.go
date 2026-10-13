@@ -10,7 +10,7 @@ import (
 var whoCmd = &cobra.Command{
 	Use:   "who <path>",
 	Short: "Find formal owner and top recent expert contributors",
-	Long:  "Queries CODEOWNERS for the formal owner and BadgerDB for top recent active contributors based on recency-decay scoring.",
+	Long:  "Queries CODEOWNERS for the formal owner and SQLite for top recent active contributors based on recency-decay scoring.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]

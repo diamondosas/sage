@@ -66,12 +66,11 @@ func TestIsIndexableSourceFile(t *testing.T) {
 		expected bool
 	}{
 		{"main.go", true},
-		{"internal/graph/badger.go", true},
+		{"internal/graph/sqlite.go", true},
 		{"README.md", true},
 		{".github/workflows/build.yml", true},
 		{".git/config", false},
-		{".github/sage/git.sst/000001.sst", false},
-		{".github/sage/000001.sst", false},
+		{".github/sage/sage.db", false},
 		{"bin/sage", false},
 		{"node_modules/pkg/index.js", false},
 		{"image.png", false},

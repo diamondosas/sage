@@ -14,7 +14,7 @@ This Privacy Policy describes how **Sage** ("we", "us", or "our") collects, uses
 ## 1. Local-First Architecture
 
 Sage is designed from the ground up as a **local-first** developer tool:
-- **No External Database Required**: Sage stores its knowledge graph directly inside the repository workspace (by default in `.github/sage` or `.sage`) using an embedded BadgerDB key-value engine.
+- **No External Database Required**: Sage stores its knowledge graph directly inside the repository workspace (by default in `.github/sage/sage.db`) using an embedded single-file SQLite engine.
 - **No Cloud Telemetry or Tracking**: Sage does **not** transmit usage telemetry, analytics, behavioral logs, or user identities to any Sage servers.
 - **On-Premise / In-Runner Execution**: In GitHub Actions, Sage executes entirely within your ephemeral GitHub Actions runner environment.
 

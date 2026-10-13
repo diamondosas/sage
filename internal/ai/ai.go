@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"path/filepath"
 	"strings"
 	"time"
@@ -188,64 +191,83 @@ func ComputeFileHash(content []byte) string {
 
 // heuristicAnalyzeFile parses code symbols offline without external LLM calls.
 func (s *Synthesizer) heuristicAnalyzeFile(path string, content []byte, hash string) FileAnalysis {
-	lines := strings.Split(string(content), "\n")
 	var exports []string
 	var dependencies []string
 	var pkgName string
 	var firstComment string
 
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "package ") && pkgName == "" {
-			pkgName = strings.TrimPrefix(trimmed, "package ")
-		}
-		if (strings.HasPrefix(trimmed, "// ") || strings.HasPrefix(trimmed, "/* ")) && firstComment == "" {
-			firstComment = strings.TrimPrefix(strings.TrimPrefix(trimmed, "// "), "/* ")
-		}
-		// Go exported functions or types
-		if strings.HasPrefix(trimmed, "func ") && len(exports) < 5 {
-			parts := strings.Fields(trimmed)
-			if len(parts) >= 2 {
-				name := strings.Split(parts[1], "(")[0]
-				if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
-					exports = append(exports, name)
+	// For Go files, use accurate standard library AST parser
+	if strings.HasSuffix(path, ".go") {
+		fset := token.NewFileSet()
+		if node, err := parser.ParseFile(fset, path, content, parser.ParseComments); err == nil {
+			pkgName = node.Name.Name
+			if node.Doc != nil {
+				firstComment = strings.TrimSpace(node.Doc.Text())
+			}
+			for _, imp := range node.Imports {
+				if len(dependencies) < 5 && imp.Path != nil {
+					dep := strings.Trim(imp.Path.Value, `"`)
+					if strings.Contains(dep, "/") {
+						dependencies = append(dependencies, dep)
+					}
+				}
+			}
+			for _, decl := range node.Decls {
+				if len(exports) >= 5 {
+					break
+				}
+				switch d := decl.(type) {
+				case *ast.FuncDecl:
+					if d.Name.IsExported() {
+						exports = append(exports, d.Name.Name)
+					}
+				case *ast.GenDecl:
+					for _, spec := range d.Specs {
+						if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.IsExported() {
+							exports = append(exports, ts.Name.Name)
+						}
+					}
 				}
 			}
 		}
-		if strings.HasPrefix(trimmed, "type ") && len(exports) < 5 {
-			parts := strings.Fields(trimmed)
-			if len(parts) >= 2 && len(parts[1]) > 0 && parts[1][0] >= 'A' && parts[1][0] <= 'Z' {
-				exports = append(exports, parts[1])
-			}
-		}
-		// Dependency imports
-		if strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") && len(dependencies) < 5 {
-			dep := strings.Trim(trimmed, "\"")
-			if strings.Contains(dep, "/") {
-				dependencies = append(dependencies, dep)
+	}
+
+	// Fallback line parsing for non-Go or unparseable files
+	if pkgName == "" && firstComment == "" && len(exports) == 0 {
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if (strings.HasPrefix(trimmed, "// ") || strings.HasPrefix(trimmed, "/* ") || strings.HasPrefix(trimmed, "# ")) && firstComment == "" {
+				firstComment = strings.TrimLeft(trimmed, "/*# ")
 			}
 		}
 	}
 
 	// Classify role based on path heuristics
-	// CHANGE HERE: Add custom role mappings based on repository folders
 	role := "Source Module"
+	cleanLower := strings.ToLower(filepath.ToSlash(path))
 	switch {
-	case strings.Contains(path, "cmd/"):
-		role = "CLI Command"
-	case strings.Contains(path, "internal/graph"):
-		role = "Knowledge Graph Storage"
-	case strings.Contains(path, "internal/ai"):
-		role = "AI Synthesis Engine"
-	case strings.Contains(path, "internal/git"):
-		role = "Git Extractor"
-	case strings.Contains(path, "internal/config"):
-		role = "Configuration"
-	case strings.HasSuffix(path, "_test.go"):
+	case strings.Contains(cleanLower, "_test.") || strings.HasPrefix(cleanLower, "test/") || strings.Contains(cleanLower, "/test/"):
 		role = "Automated Test Suite"
-	case strings.HasSuffix(path, ".md"):
+	case strings.Contains(cleanLower, "cmd/") || strings.HasSuffix(cleanLower, "/main.go") || cleanLower == "main.go" || strings.Contains(cleanLower, "cli/"):
+		role = "CLI Command"
+	case strings.Contains(cleanLower, "internal/graph") || strings.Contains(cleanLower, "graph/"):
+		role = "Knowledge Graph Storage"
+	case strings.Contains(cleanLower, "internal/ai") || strings.Contains(cleanLower, "/ai/"):
+		role = "AI Synthesis Engine"
+	case strings.Contains(cleanLower, "internal/git") || strings.Contains(cleanLower, "/git/"):
+		role = "Git Extractor"
+	case strings.Contains(cleanLower, "internal/config") || strings.Contains(cleanLower, "config"):
+		role = "Configuration"
+	case strings.Contains(cleanLower, "mcp/") || strings.Contains(cleanLower, "server/"):
+		role = "Protocol Server"
+	case strings.Contains(cleanLower, "store") || strings.Contains(cleanLower, "db/") || strings.Contains(cleanLower, "database/"):
+		role = "Data Storage / Models"
+	case strings.Contains(cleanLower, "api/") || strings.Contains(cleanLower, "http/") || strings.Contains(cleanLower, "handler/"):
+		role = "API / HTTP Handler"
+	case strings.HasSuffix(cleanLower, ".md"):
 		role = "Documentation"
-	case strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml"):
+	case strings.HasSuffix(cleanLower, ".yml") || strings.HasSuffix(cleanLower, ".yaml"):
 		role = "Workflow / CI Config"
 	}
 

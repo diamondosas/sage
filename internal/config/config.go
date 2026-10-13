@@ -9,11 +9,6 @@ import (
 
 // Config holds all runtime parameters for Sage.
 type Config struct {
-	// FalkorDB Connection Settings
-	FalkorHost string // Host for FalkorDB (e.g., "127.0.0.1" or "falkordb")
-	FalkorPort int    // Port for FalkorDB (default: 6379)
-	GraphName  string // Key name for the graph (default: "sage")
-
 	// Git Ingestion Settings
 	MaxCommits    int           // Max commits to scan backwards (default: 500)
 	DecayHalfLife time.Duration // Half-life for expertise scoring decay (default: 60 days)
@@ -22,50 +17,83 @@ type Config struct {
 	GitHubToken string // Token for GitHub REST API (reads from GITHUB_TOKEN)
 
 	// AI / LLM Settings via GoAI (github.com/zendev-sh/goai)
-	LLMProvider string // Provider: "google", "openai", "anthropic", or "ollama"
+	LLMProvider string // Provider: "google", "openai", "anthropic", "groq", "grok", or "ollama"
 	LLMModel    string // Model name (e.g., "gemini-2.5-flash", "gpt-4o-mini", "llama3")
 	LLMKey      string // API key for selected provider
 	OllamaHost  string // Custom Ollama host if using local models (default: "http://localhost:11434")
 
-	// LadybugDB Embedded Storage
-	BadgerPath string // Path to LadybugDB directory (default: ".github/sage")
-
 	// Storage Paths
+	DBPath  string // Path to SQLite database file or directory (default: ".github/sage")
 	SageDir string // Local cache directory (default: ".github/sage")
 }
 
 // LoadFromEnv loads configuration with sensible defaults and environment overrides.
 func LoadFromEnv() *Config {
-	// Provider selection
-	// CHANGE HERE: Change default provider to "groq", "grok", "openai", "anthropic", or "ollama"
-	provider := getEnv("LLM_PROVIDER", "")
+	provider := strings.ToLower(getEnv("LLM_PROVIDER", ""))
 
-	// Check API keys
-	apiKey := getEnvMulti("GROQ_API_KEY", "GROK_API_KEY", "XAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
+	groqKey := os.Getenv("GROQ_API_KEY")
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	grokKey := getEnvMulti("GROK_API_KEY", "XAI_API_KEY")
 
-	// Auto-detect Groq keys (starts with "gsk_")
+	// Auto-detect provider if not explicitly specified
 	if provider == "" {
-		if strings.HasPrefix(apiKey, "gsk_") {
+		switch {
+		case groqKey != "" || strings.HasPrefix(grokKey, "gsk_"):
 			provider = "groq"
-		} else {
+		case geminiKey != "":
+			provider = "google"
+		case openaiKey != "":
+			provider = "openai"
+		case anthropicKey != "":
+			provider = "anthropic"
+		case grokKey != "":
+			provider = "grok"
+		default:
 			provider = "google"
 		}
 	}
 
-	// Default model selection based on provider
-	// CHANGE HERE: Modify default model per provider
-	defaultModel := "gemini-2.5-flash"
-	switch strings.ToLower(provider) {
+	// Select key matching the resolved provider
+	var apiKey string
+	switch provider {
 	case "groq":
-		defaultModel = "openai/gpt-oss-120b" // Fast Groq model, can also be "qwen/qwen3.8-27b"
-	case "grok":
-		if strings.HasPrefix(apiKey, "gsk_") {
-			// If Groq key provided under 'grok', route to Groq model
-			provider = "groq"
-			defaultModel = "openai/gpt-oss-120b"
-		} else {
-			defaultModel = "grok-beta"
+		if groqKey != "" {
+			apiKey = groqKey
+		} else if strings.HasPrefix(grokKey, "gsk_") {
+			apiKey = grokKey
 		}
+	case "google", "gemini":
+		provider = "google"
+		apiKey = geminiKey
+	case "openai":
+		apiKey = openaiKey
+	case "anthropic":
+		apiKey = anthropicKey
+	case "grok":
+		if strings.HasPrefix(grokKey, "gsk_") {
+			provider = "groq"
+			apiKey = grokKey
+		} else {
+			apiKey = grokKey
+		}
+	case "ollama":
+		apiKey = ""
+	}
+
+	// Fallback to any available key if provider key is still empty
+	if apiKey == "" && provider != "ollama" {
+		apiKey = getEnvMulti("GROQ_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROK_API_KEY", "XAI_API_KEY")
+	}
+
+	// Default model selection based on provider
+	defaultModel := "gemini-2.5-flash"
+	switch provider {
+	case "groq":
+		defaultModel = "openai/gpt-oss-120b"
+	case "grok":
+		defaultModel = "grok-beta"
 	case "openai":
 		defaultModel = "gpt-4o-mini"
 	case "anthropic":
@@ -75,28 +103,19 @@ func LoadFromEnv() *Config {
 	}
 
 	return &Config{
-		// FalkorDB settings
-		// CHANGE HERE: Modify host if FalkorDB is on another machine or container
-		FalkorHost: getEnv("FALKORDB_HOST", "127.0.0.1"),
-		FalkorPort: getEnvInt("FALKORDB_PORT", 6379),
-		GraphName:  getEnv("FALKORDB_GRAPH", "sage"),
-
 		// Git scanning settings
-		// CHANGE HERE: Tune max commits to scan (e.g. 200 for fast test, 1000 for deep history)
-		MaxCommits: getEnvInt("SAGE_MAX_COMMITS", 500),
-		// CHANGE HERE: Tune how quickly past contributor activity decays (in days)
+		MaxCommits:    getEnvInt("SAGE_MAX_COMMITS", 500),
 		DecayHalfLife: time.Duration(getEnvInt("SAGE_DECAY_DAYS", 60)) * 24 * time.Hour,
 
 		// GitHub & GoAI settings
 		GitHubToken: os.Getenv("GITHUB_TOKEN"),
 		LLMProvider: provider,
-		// CHANGE HERE: Set custom model via LLM_MODEL env var
-		LLMModel:   getEnv("LLM_MODEL", defaultModel),
-		LLMKey:     apiKey,
-		OllamaHost: getEnv("OLLAMA_HOST", "http://localhost:11434"),
+		LLMModel:    getEnv("LLM_MODEL", defaultModel),
+		LLMKey:      apiKey,
+		OllamaHost:  getEnv("OLLAMA_HOST", "http://localhost:11434"),
 
-		BadgerPath: getEnv("SAGE_DB_PATH", ".github/sage"),
-		SageDir:    ".github/sage",
+		DBPath:  getEnv("SAGE_DB_PATH", ".github/sage"),
+		SageDir: ".github/sage",
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 	"sage/internal/graph"
 )
 
-// Server wraps the MCP server instance and BadgerDB graph engine.
+// Server wraps the MCP server instance and SQLite knowledge engine.
 type Server struct {
 	Engine *graph.Engine
 }
@@ -64,25 +64,25 @@ func (s *Server) StartStdio() error {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		var sb strings.Builder
-		sb.WriteString("Sage Knowledge Graph Overview:\n\n")
-		sb.WriteString("📦 Git Graph (git.lddb):\n")
+		sb.WriteString("Sage Knowledge Overview (.github/sage/sage.db):\n\n")
+		sb.WriteString("📦 Git History Knowledge:\n")
 		sb.WriteString(fmt.Sprintf("  - Commits: %d\n  - Contributors: %d\n  - Files: %d\n  - Last Synced: %s\n\n", dual.GitCommits, dual.GitPeople, dual.GitFiles, dual.GitLastSynced))
-		sb.WriteString("🧠 AI Mind Graph (sage.lddb):\n")
+		sb.WriteString("🧠 AI Mind Knowledge:\n")
 		sb.WriteString(fmt.Sprintf("  - Analyzed Files: %d\n  - Architectural Roles: %d\n  - Decisions: %d\n  - Last Synced: %s\n", dual.MindFiles, dual.MindRoles, dual.MindDecisions, dual.MindLastSynced))
 		return mcp.NewToolResultText(sb.String()), nil
 	})
 
 	// 4. Tool: sage_query
 	queryTool := mcp.NewTool("sage_query",
-		mcp.WithDescription("Execute prefix query or Cypher query in LadybugDB"),
-		mcp.WithString("query", mcp.Required(), mcp.Description("Key prefix to scan or Cypher query in LadybugDB")),
+		mcp.WithDescription("Execute SQL query or table search in the SQLite knowledge database"),
+		mcp.WithString("query", mcp.Required(), mcp.Description("SQL query (e.g. 'SELECT * FROM commits') or search keyword")),
 	)
 	sServer.AddTool(queryTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		q := req.GetString("query", "")
 		if q == "" {
 			q = req.GetString("cypher", "")
 		}
-		rows, err := s.Engine.ExecuteRawCypher(q)
+		rows, err := s.Engine.ExecuteRawSQL(q)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

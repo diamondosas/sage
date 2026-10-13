@@ -23,5 +23,7 @@ Thumbs.db
 
 prompt.txt
 PLAN.md
-SETUP.md
-lib-ladybug/lib
+# SQLite temp files
+*.db-wal
+*.db-shm
+*.db-journal
