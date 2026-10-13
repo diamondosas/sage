@@ -80,3 +80,34 @@ func TestParseCodeownersFile(t *testing.T) {
 		t.Errorf("unexpected second rule: %+v", rules[1])
 	}
 }
+
+func TestIncrementalGitExtraction(t *testing.T) {
+	// Test on current repository
+	extractor := NewExtractor(".", 10, 60*24*time.Hour)
+	headSHA, err := extractor.GetHeadSHA()
+	if err != nil {
+		t.Fatalf("GetHeadSHA failed: %v", err)
+	}
+	if len(headSHA) < 40 {
+		t.Errorf("expected 40-char SHA, got %s", headSHA)
+	}
+
+	// Commits since HEAD should be empty
+	commits, err := extractor.ExtractCommitsSince(headSHA)
+	if err != nil {
+		t.Fatalf("ExtractCommitsSince(HEAD) failed: %v", err)
+	}
+	if len(commits) != 0 {
+		t.Errorf("expected 0 commits since HEAD, got %d", len(commits))
+	}
+
+	// Tracked files should include main files
+	tracked, err := extractor.ListTrackedFiles()
+	if err != nil {
+		t.Fatalf("ListTrackedFiles failed: %v", err)
+	}
+	if len(tracked) == 0 {
+		t.Errorf("expected tracked files, got 0")
+	}
+}
+

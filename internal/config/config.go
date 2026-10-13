@@ -27,8 +27,8 @@ type Config struct {
 	LLMKey      string // API key for selected provider
 	OllamaHost  string // Custom Ollama host if using local models (default: "http://localhost:11434")
 
-	// Badger Embedded Storage
-	BadgerPath string // Path to Badger DB directory (default: ".github/sage")
+	// LadybugDB Embedded Storage
+	BadgerPath string // Path to LadybugDB directory (default: ".github/sage")
 
 	// Storage Paths
 	SageDir string // Local cache directory (default: ".github/sage")

@@ -4,7 +4,7 @@ set -e
 # --- Variables (Edit these if needed) ---
 # Repository to download releases from (format: owner/repo)
 # CHANGE HERE: Replace with your GitHub repository owner/name
-REPO="${SAGE_REPO:-your-org/sage}"
+REPO="${SAGE_REPO:-diamondosas/sage}"
 # Target installation directory (e.g., /usr/local/bin, ~/.local/bin, or ./bin)
 # CHANGE HERE: Set custom install directory via INSTALL_DIR env var
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"

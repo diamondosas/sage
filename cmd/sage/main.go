@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"sage/cmd/sage/internal"
+	"sage/cmd/sage/cli"
 )
 
 func main() {
-	if err := internal.Execute(); err != nil {
+	if err := cli.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

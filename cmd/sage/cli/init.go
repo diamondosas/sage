@@ -1,4 +1,4 @@
-package internal
+package cli
 
 import (
 	"bufio"
@@ -49,7 +49,7 @@ jobs:
           if [ -f "./install/install.sh" ]; then
             bash ./install/install.sh
           else
-            curl -fsSL https://raw.githubusercontent.com/your-org/sage/main/install/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/diamondosas/sage/main/install/install.sh | bash
           fi
 
       - name: Run Sage Sync

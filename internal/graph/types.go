@@ -21,3 +21,19 @@ type QueryResult struct {
 	Headers []string
 	Rows    [][]string
 }
+
+// DualOverviewStats holds repository statistics across both git.lddb and sage.lddb.
+type DualOverviewStats struct {
+	// Git Graph (git.lddb)
+	GitCommits    int
+	GitPeople     int
+	GitFiles      int
+	GitLastSynced string
+
+	// AI Mind Graph (sage.lddb)
+	MindFiles      int
+	MindDecisions  int
+	MindRoles      int
+	MindLastSynced string
+}
+

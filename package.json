@@ -7,8 +7,8 @@
     "sage": "./bin/sage-cli.js"
   },
   "scripts": {
-    "setup": "node ./installer/setup.js",
-    "postinstall": "node ./installer/setup.js"
+    "setup": "node ./install/setup.js",
+    "postinstall": "node ./install/setup.js"
   },
   "keywords": [
     "sage",
@@ -22,7 +22,7 @@
     "antigravity"
   ],
   "author": "Sage",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   }

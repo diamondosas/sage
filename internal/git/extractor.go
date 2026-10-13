@@ -28,6 +28,17 @@ func NewExtractor(repoPath string, maxCommits int, decayHalfLife time.Duration) 
 	}
 }
 
+// GetHeadSHA returns the current Git HEAD commit SHA.
+func (e *Extractor) GetHeadSHA() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = e.RepoPath
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // ExtractCommits reads recent commit history via standard git log.
 func (e *Extractor) ExtractCommits() ([]Commit, error) {
 	// Format: SHA|AuthorName|AuthorEmail|Date(ISO)|Subject
@@ -54,6 +65,108 @@ func (e *Extractor) ExtractCommits() ([]Commit, error) {
 		return nil, fmt.Errorf("git log error: %w (%s)", err, strings.TrimSpace(outStr))
 	}
 
+	return parseGitLogOutput(output)
+}
+
+// ExtractCommitsSince extracts commits between sinceSHA and HEAD incrementally.
+// If sinceSHA is empty or invalid, falls back to ExtractCommits.
+func (e *Extractor) ExtractCommitsSince(sinceSHA string) ([]Commit, error) {
+	if sinceSHA == "" {
+		return e.ExtractCommits()
+	}
+
+	// Verify commit exists in repository history
+	verifyCmd := exec.Command("git", "cat-file", "-e", sinceSHA)
+	verifyCmd.Dir = e.RepoPath
+	if err := verifyCmd.Run(); err != nil {
+		// Commit not found (shallow clone or rebased history) -> full extraction
+		return e.ExtractCommits()
+	}
+
+	revisionRange := fmt.Sprintf("%s..HEAD", sinceSHA)
+	args := []string{
+		"log",
+		"--name-only",
+		"--pretty=format:COMMIT_START%n%H|%an|%ae|%aI|%s",
+		revisionRange,
+	}
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = e.RepoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("git log incremental error: %w (%s)", err, strings.TrimSpace(string(output)))
+	}
+
+	return parseGitLogOutput(output)
+}
+
+// GetChangedFilesSince detects files added, modified, or deleted since sinceSHA.
+// If sinceSHA is empty or invalid, returns all tracked files via git ls-files.
+func (e *Extractor) GetChangedFilesSince(sinceSHA string) ([]string, []string, error) {
+	if sinceSHA == "" {
+		files, err := e.ListTrackedFiles()
+		return files, nil, err
+	}
+
+	// Verify commit exists
+	verifyCmd := exec.Command("git", "cat-file", "-e", sinceSHA)
+	verifyCmd.Dir = e.RepoPath
+	if err := verifyCmd.Run(); err != nil {
+		files, err := e.ListTrackedFiles()
+		return files, nil, err
+	}
+
+	cmd := exec.Command("git", "diff", "--name-status", fmt.Sprintf("%s..HEAD", sinceSHA))
+	cmd.Dir = e.RepoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, nil, fmt.Errorf("git diff error: %w", err)
+	}
+
+	var addedOrModified []string
+	var deleted []string
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			status := parts[0]
+			path := parts[len(parts)-1] // Support rename syntax R100 old new
+			if strings.HasPrefix(status, "D") {
+				deleted = append(deleted, path)
+			} else {
+				addedOrModified = append(addedOrModified, path)
+			}
+		}
+	}
+	return addedOrModified, deleted, nil
+}
+
+// ListTrackedFiles lists all tracked files in the repository.
+func (e *Extractor) ListTrackedFiles() ([]string, error) {
+	cmd := exec.Command("git", "ls-files")
+	cmd.Dir = e.RepoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files error: %w", err)
+	}
+
+	var files []string
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	return files, nil
+}
+
+func parseGitLogOutput(output []byte) ([]Commit, error) {
 	var commits []Commit
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 

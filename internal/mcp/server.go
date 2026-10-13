@@ -59,22 +59,23 @@ func (s *Server) StartStdio() error {
 		mcp.WithDescription("Get a compact overview of repository graph statistics"),
 	)
 	sServer.AddTool(overviewTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		stats, err := s.Engine.QueryOverview()
+		dual, err := s.Engine.QueryDualOverview()
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		var sb strings.Builder
-		sb.WriteString("Sage Knowledge Graph Overview:\n")
-		for k, v := range stats {
-			sb.WriteString(fmt.Sprintf("- %s: %d\n", k, v))
-		}
+		sb.WriteString("Sage Knowledge Graph Overview:\n\n")
+		sb.WriteString("📦 Git Graph (git.lddb):\n")
+		sb.WriteString(fmt.Sprintf("  - Commits: %d\n  - Contributors: %d\n  - Files: %d\n  - Last Synced: %s\n\n", dual.GitCommits, dual.GitPeople, dual.GitFiles, dual.GitLastSynced))
+		sb.WriteString("🧠 AI Mind Graph (sage.lddb):\n")
+		sb.WriteString(fmt.Sprintf("  - Analyzed Files: %d\n  - Architectural Roles: %d\n  - Decisions: %d\n  - Last Synced: %s\n", dual.MindFiles, dual.MindRoles, dual.MindDecisions, dual.MindLastSynced))
 		return mcp.NewToolResultText(sb.String()), nil
 	})
 
 	// 4. Tool: sage_query
 	queryTool := mcp.NewTool("sage_query",
-		mcp.WithDescription("Execute prefix query to inspect records in BadgerDB"),
-		mcp.WithString("query", mcp.Required(), mcp.Description("Key prefix to scan in BadgerDB")),
+		mcp.WithDescription("Execute prefix query or Cypher query in LadybugDB"),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Key prefix to scan or Cypher query in LadybugDB")),
 	)
 	sServer.AddTool(queryTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		q := req.GetString("query", "")

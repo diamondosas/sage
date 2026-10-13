@@ -2,11 +2,6 @@
 /**
  * Sage — Unified Cross-Platform Agent Skill & Binary Installer
  *
- * Modeled after Caveman (https://github.com/JuliusBrussee/caveman).
- * Detects installed AI coding agents (Cursor, Claude Code, Antigravity, Copilot, Codex, Windsurf)
- * and installs the Sage skill (SKILL.md) into their respective configuration folders,
- * while ensuring the Sage CLI binary is built and ready to use.
- *
  * Usage:
  *   node installer/setup.js [--install] [--dry-run]
  */

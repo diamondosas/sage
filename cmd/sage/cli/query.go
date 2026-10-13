@@ -1,4 +1,4 @@
-package internal
+package cli
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 )
 
 var queryCmd = &cobra.Command{
-	Use:   "query <key_prefix>",
-	Short: "Inspect stored entries in BadgerDB",
-	Long:  "Inspects keys and stored records directly in the local BadgerDB embedded store matching the given key prefix.",
+	Use:   "query <key_prefix|cypher_query>",
+	Short: "Inspect stored entries or execute Cypher in LadybugDB",
+	Long:  "Inspects keys matching a prefix or executes Cypher queries directly on the local LadybugDB embedded store.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		keyPrefix := args[0]
@@ -26,7 +26,7 @@ var queryCmd = &cobra.Command{
 			return fmt.Errorf("query execution failed: %w", err)
 		}
 
-		fmt.Println("\n📋 BadgerDB Stored Results:")
+		fmt.Println("\n📋 LadybugDB Query Results:")
 		fmt.Println(strings.Repeat("─", 45))
 		if len(rows) == 0 {
 			fmt.Println("  (No results returned)")

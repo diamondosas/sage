@@ -1,11 +1,12 @@
-package internal
+package cli
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"sage/internal/mcp"
+
+	"github.com/spf13/cobra"
 )
 
 var mcpCmd = &cobra.Command{
