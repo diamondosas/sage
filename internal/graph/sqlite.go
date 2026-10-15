@@ -730,3 +730,49 @@ func (e *Engine) fallbackPrefixSearch(term string) ([][]string, error) {
 
 	return rows, nil
 }
+
+// QueryArchitectureGraph extracts coarse-grained architectural domain clusters and dependency edges from the SQLite store.
+func (e *Engine) QueryArchitectureGraph() (*ArchitectureGraph, error) {
+	rows, err := e.db.Query(`
+		SELECT path, summary, role, exports, dependencies
+		FROM files
+		ORDER BY path ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query files for architecture graph: %w", err)
+	}
+	defer rows.Close()
+
+	var records []StoredFileRecord
+	for rows.Next() {
+		var path string
+		var summary, role, exportsRaw, depsRaw sql.NullString
+
+		if err := rows.Scan(&path, &summary, &role, &exportsRaw, &depsRaw); err != nil {
+			return nil, fmt.Errorf("scan file record: %w", err)
+		}
+
+		var exports, deps []string
+		if exportsRaw.Valid && exportsRaw.String != "" {
+			_ = json.Unmarshal([]byte(exportsRaw.String), &exports)
+		}
+		if depsRaw.Valid && depsRaw.String != "" {
+			_ = json.Unmarshal([]byte(depsRaw.String), &deps)
+		}
+
+		records = append(records, StoredFileRecord{
+			Path:         path,
+			Summary:      summary.String,
+			Role:         role.String,
+			Exports:      exports,
+			Dependencies: deps,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return BuildArchitectureGraph(records), nil
+}
+
