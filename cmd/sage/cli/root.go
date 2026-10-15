@@ -32,11 +32,8 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(syncCmd)
-	rootCmd.AddCommand(whoCmd)
-	rootCmd.AddCommand(whyCmd)
 	rootCmd.AddCommand(overviewCmd)
 	rootCmd.AddCommand(queryCmd)
-	rootCmd.AddCommand(mcpCmd)
 }
 
 // Execute runs the Sage root CLI command.

@@ -6,7 +6,7 @@ import (
 )
 
 func TestRootCommandRegistration(t *testing.T) {
-	expectedCommands := []string{"init", "sync", "who", "why", "overview", "query", "mcp"}
+	expectedCommands := []string{"init", "setup", "sync", "overview", "query"}
 
 	for _, name := range expectedCommands {
 		cmd, _, err := rootCmd.Find([]string{name})
@@ -14,31 +14,26 @@ func TestRootCommandRegistration(t *testing.T) {
 			t.Errorf("expected subcommand %q to be registered on rootCmd", name)
 		}
 	}
+
+	purgedCommands := []string{"who", "why", "mcp"}
+	for _, name := range purgedCommands {
+		cmd, _, _ := rootCmd.Find([]string{name})
+		if cmd != nil && cmd.Name() == name {
+			t.Errorf("deprecated command %q should NOT be registered on rootCmd", name)
+		}
+	}
 }
 
 func TestCommandArgsValidation(t *testing.T) {
-	// 'who' requires exactly 1 argument
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"who"})
-
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Errorf("expected 'sage who' without args to fail with validation error")
-	}
-
-	// 'why' requires exactly 1 argument
-	rootCmd.SetArgs([]string{"why"})
-	err = rootCmd.Execute()
-	if err == nil {
-		t.Errorf("expected 'sage why' without args to fail with validation error")
-	}
 
 	// 'query' requires exactly 1 argument
 	rootCmd.SetArgs([]string{"query"})
-	err = rootCmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Errorf("expected 'sage query' without args to fail with validation error")
 	}
 }
+
