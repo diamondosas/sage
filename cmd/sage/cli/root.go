@@ -34,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	rootCmd.AddCommand(overviewCmd)
 	rootCmd.AddCommand(queryCmd)
+	rootCmd.AddCommand(uiCmd)
 }
 
 // Execute runs the Sage root CLI command.

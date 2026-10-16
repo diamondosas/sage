@@ -61,23 +61,20 @@ Run to get compact statistics and architecture knowledge without bloating your p
 sage overview
 ```
 
-### 2. Ownership & Tribal Knowledge Lookup
-Run to find who is formally responsible (`CODEOWNERS`) and who actually knows the code (recency-decay commit scoring):
+### 2. Interactive Architecture Visualizer & REST API
+Launch the local web visualizer and embedded REST endpoints:
 ```bash
-sage who <path-to-file-or-dir>
+sage ui
 ```
-*Example:* `sage who internal/auth/`  
-*Result:* Returns formal owner and top recent active contributors.
+Flags:
+- `--port <number>`: Port to run the server on (default: `8080` or next open port).
+- `--no-browser`: Start the server without automatically launching the browser.
 
-### 3. Decision Lineage & "Why" Trace
-Run to find out why a line of code, file, or architectural pattern was created:
-```bash
-sage why <file-path-or-commit-sha>
-```
-*Example:* `sage why internal/config/config.go`  
-*Result:* Returns commit history, linked PR discussions, and synthesized decision rationale.
+**API Endpoints:**
+- `GET http://127.0.0.1:8080/api/graph`: Returns domain clusters, member files, and dependency edges.
+- `GET http://127.0.0.1:8080/api/file?path=<path>`: Returns detailed inspection data (role, exports, dependencies, owner, experts, decision lineage).
 
-### 4. Custom SQL & Record Queries
+### 3. Custom SQL & Record Queries
 Run targeted queries directly against `.github/sage/sage.db`:
 ```bash
 sage query "SELECT name, email, recency_score FROM people ORDER BY recency_score DESC LIMIT 5"
@@ -87,33 +84,3 @@ Or search for keyword records:
 sage query "auth"
 ```
 
-## MCP Tools Integration
-When Sage is running as an MCP server (`sage mcp`) in Cursor, Claude Code, or Antigravity:
-- `sage_who_owns`: Pass `{"path": "internal/auth"}` to look up owners & experts.
-- `sage_why`: Pass `{"target": "internal/auth/token.go"}` to trace decisions and PR discussions.
-- `sage_overview`: Call to get repository graph statistics.
-- `sage_query`: Pass `{"query": "..."}` for SQL queries and knowledge search.
-```
-
----
-
-## 🔌 Model Context Protocol (MCP) Setup
-
-Sage includes a built-in MCP server over standard I/O:
-
-```bash
-sage mcp
-```
-
-Add this to your MCP configuration (e.g. `claude_desktop_config.json` or Cursor MCP settings):
-
-```json
-{
-  "mcpServers": {
-    "sage": {
-      "command": "sage",
-      "args": ["mcp"]
-    }
-  }
-}
-```

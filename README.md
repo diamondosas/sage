@@ -25,10 +25,10 @@ Sage connects these dots automatically:
 
 ### ✨ What It Does
 
-* **👑 Find Owners & Experts (`sage who`):** Instantly see who wrote a file and who knows it best based on recent commits.
-* **🔍 Understand Why Code Exists (`sage why`):** Trace files and commits back to the original pull requests and team decisions.
+* **🌐 Interactive Architecture Visualizer (`sage ui`):** Launch a local, zero-friction web visualizer grouping files into high-level domain clusters with deep file inspection (owners, experts, exports, dependencies, and PR decision history).
+* **📊 High-Level Context (`sage overview`):** Instantly get repository-wide architecture statistics, top files, and ownership metrics.
+* **🔎 Targeted Knowledge Queries (`sage query`):** Run full-text search or SQL queries directly against `.github/sage/sage.db`.
 * **📦 Just One Clean File:** Everything is stored inside a single SQLite file (`.github/sage/sage.db`). No servers, no extra setup, no messy folders.
-* **🤖 AI Ready via MCP:** Plug it directly into Cursor, Claude Code, or Antigravity with built-in Model Context Protocol (MCP) support.
 
 ---
 
@@ -46,43 +46,22 @@ sage sync
 ```
 Sage reads your Git history and builds your local knowledge base in seconds.
 
-#### 3. Ask Sage questions
+#### 3. Explore your codebase
 
-**Find out who knows a file best:**
+**Launch the interactive architecture visualizer:**
 ```bash
-sage who internal/auth/token.go
+sage ui
 ```
-
-**Trace why a piece of code was written:**
-```bash
-sage why internal/auth/token.go
-```
+Opens your browser to `http://127.0.0.1:8080` (or use `--no-browser` and `--port`).
 
 **Get a quick overview of your repository:**
 ```bash
 sage overview
 ```
 
----
-
-### 🔌 Connect to Your AI (MCP)
-
-Sage includes a built-in MCP server so tools like **Claude Code**, **Cursor**, and **Antigravity** can query it automatically while you code:
-
+**Query knowledge or search records:**
 ```bash
-sage mcp
-```
-
-Add this to your MCP configuration (e.g. `claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "sage": {
-      "command": "sage",
-      "args": ["mcp"]
-    }
-  }
-}
+sage query "auth"
 ```
 
 ---

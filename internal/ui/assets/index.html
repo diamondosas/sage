@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sage Architecture Visualizer</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="brand-section">
+      <a href="/" class="brand-logo" id="view-graph-btn">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span>Sage</span>
+      </a>
+      <span class="brand-badge">Architecture Visualizer</span>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="search-section">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search domains, files, symbols, roles..." autocomplete="off" spellcheck="false">
+        <kbd class="search-kbd">/</kbd>
+      </div>
+      <div id="search-results-overlay"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="nav-controls">
+      <button class="btn-icon" id="theme-toggle" title="Toggle Theme" aria-label="Toggle Theme">
+        <!-- Icon populated dynamically -->
+      </button>
+    </div>
+  </header>
+
+  <!-- Sub-header / Stats & Breadcrumbs -->
+  <div class="stats-bar">
+    <div class="breadcrumbs" id="breadcrumbs">
+      <span class="breadcrumb-active">System Architecture Overview</span>
+    </div>
+    <div class="stats-items">
+      <div class="stat-item">
+        <span>Domains:</span>
+        <span class="stat-num" id="stat-clusters">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Files:</span>
+        <span class="stat-num" id="stat-files">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Inter-domain links:</span>
+        <span class="stat-num" id="stat-edges">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main View Area -->
+  <main class="app-main">
+    <!-- View 1: Architecture Graph (SVG Canvas) -->
+    <section id="arch-graph">
+      <svg id="graph-svg">
+        <g id="graph-viewport"></g>
+      </svg>
+
+      <!-- Zoom / Pan Controls -->
+      <div class="canvas-controls">
+        <button id="zoom-in-btn" title="Zoom In" aria-label="Zoom In">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button id="zoom-out-btn" title="Zoom Out" aria-label="Zoom Out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+        </button>
+        <button id="zoom-reset-btn" title="Reset View" aria-label="Reset View">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+
+      <!-- Legend -->
+      <div class="graph-legend">
+        <span class="legend-title">Graph Legend</span>
+        <div class="legend-row">
+          <div class="legend-line"></div>
+          <span>Dependency Link</span>
+        </div>
+        <div class="legend-row" style="margin-top: 2px;">
+          <span style="font-family: var(--font-mono); font-size: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1px 4px; border-radius: 3px;">N</span>
+          <span>Import Count</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 2: Cluster Drill-Down View -->
+    <section id="cluster-view">
+      <!-- Dynamically populated by app.js -->
+    </section>
+  </main>
+
+  <!-- Detail Drawer (Slide-Over Inspector) -->
+  <aside id="detail-drawer" aria-label="File Inspection Details">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <h3 class="drawer-file-path" id="drawer-path">file.go</h3>
+        <span class="role-badge drawer-role" id="drawer-role">Component</span>
+      </div>
+      <button class="drawer-close-btn" id="drawer-close-btn" title="Close Drawer (Esc)" aria-label="Close Drawer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-content" id="drawer-body">
+      <!-- Populated dynamically upon clicking any file node -->
+    </div>
+  </aside>
+
+  <!-- Drawer Backdrop -->
+  <div id="drawer-backdrop"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

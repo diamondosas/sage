@@ -7,9 +7,14 @@ bin/*
 dist/
 
 # Local Sage database & cache
-.sage/db/
-.sage/*.lock
-.sage/*.log
+.github/sage/*.db-wal
+.github/sage/*.db-shm
+# BadgerDB leftover guard (project uses SQLite now)
+.github/sage/*.sst
+.github/sage/*.vlog
+.github/sage/DISCARD
+.github/sage/KEYREGISTRY
+.github/sage/MANIFEST
 
 # Environment & Secrets
 .env

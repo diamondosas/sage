@@ -50,7 +50,7 @@ jobs:
         uses: diamondosas/sage@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          llm_provider: 'google'
+          llm_provider: 'claude'
           llm_api_key: ${{ secrets.GEMINI_API_KEY }}
           max_commits: 1000
 
@@ -85,7 +85,7 @@ my-repository/
 │   │   └── config.json          <-- Repository configuration
 │   └── workflows/
 │       └── sage-cron-sync.yml    <-- Scheduled cron action workflow
-├── AGENTS.md                     <-- AI agent instructions (sage who / why)
+├── AGENTS.md                     <-- AI agent instructions (sage ui / overview)
 ├── CODEOWNERS                    <-- Formal ownership definitions
 ├── src/                          <-- Application code
 └── README.md

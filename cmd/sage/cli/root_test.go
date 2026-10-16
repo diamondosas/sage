@@ -6,7 +6,7 @@ import (
 )
 
 func TestRootCommandRegistration(t *testing.T) {
-	expectedCommands := []string{"init", "setup", "sync", "overview", "query"}
+	expectedCommands := []string{"init", "setup", "sync", "overview", "query", "ui"}
 
 	for _, name := range expectedCommands {
 		cmd, _, err := rootCmd.Find([]string{name})

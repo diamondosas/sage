@@ -19,7 +19,7 @@ By installing, configuring, or running Sage in your local environment or GitHub 
 
 ## 2. Description of Service
 
-Sage is a Git-native company brain and codebase intelligence system. It indexes git commits, CODEOWNERS rules, and pull request discussions into an embedded into SQLITE knowledge graph. It provides CLI commands (`sage who`, `sage why`, `sage query`, `sage overview`) and an MCP server for AI coding assistants.
+Sage is a Git-native company brain and codebase intelligence system. It indexes git commits, CODEOWNERS rules, and pull request discussions into an embedded SQLite knowledge graph. It provides CLI commands (`sage ui`, `sage query`, `sage overview`) and an interactive architecture visualizer for humans and AI coding assistants.
 
 ---
 

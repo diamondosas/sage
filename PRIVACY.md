@@ -22,7 +22,7 @@ Sage is designed from the ground up as a **local-first** developer tool:
 
 ## 2. Information Handled by Sage
 
-When you run Sage (`sage sync`, `sage who`, `sage why`, etc.) or use the GitHub Action:
+When you run Sage (`sage sync`, `sage ui`, `sage overview`, `sage query`, etc.) or use the GitHub Action:
 1. **Git Metadata**: Sage scans local commit history (author names, email addresses, commit timestamps, and modified file paths) to construct ownership and decision graphs. This information stays strictly within your repository.
 2. **GitHub Tokens (`GITHUB_TOKEN`)**: If provided, your GitHub token is used ephemerally to fetch pull request discussions and merged issue references via the official GitHub REST API. The token is never stored, logged, or forwarded to third parties.
 3. **LLM API Keys (`GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.)**: If you enable AI decision synthesis, your API key is sent directly over TLS to your chosen AI provider (Google, OpenAI, Anthropic, or local Ollama). Sage does not intercept, log, or proxy your keys.

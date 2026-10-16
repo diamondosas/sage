@@ -117,12 +117,10 @@ var initCmd = &cobra.Command{
 			fmt.Println("✓ Generated GitHub Actions auto-sync workflow in " + workflowPath)
 		}
 
-		// 4. Generate AGENTS.md instructions for Cursor / Claude Code / Antigravity
 		agentsContent := `# Sage Agent Instructions
 
 This repository is indexed by Sage (SQLite: ` + "`" + `.github/sage/sage.db` + "`" + `). When working in this codebase:
-- Run 'sage who <file>' to find formal owners and top recent expert contributors.
-- Run 'sage why <target>' to trace why code, dependencies, or decisions exist.
+- Run 'sage ui --no-browser' to serve the architecture graph and query file details via REST (` + "`" + `/api/graph` + "`" + `, ` + "`" + `/api/file?path=<path>` + "`" + `).
 - Run 'sage overview' to see high-level repository knowledge statistics.
 - Run 'sage query "<sql_or_search>"' to query or inspect stored records.
 `

@@ -144,8 +144,7 @@
             <ul class="lvl2">
               <li><a class="nav-link" href="#item-cmd-init">sage init</a></li>
               <li><a class="nav-link" href="#item-cmd-sync">sage sync</a></li>
-              <li><a class="nav-link" href="#item-cmd-who">sage who &lt;file&gt;</a></li>
-              <li><a class="nav-link" href="#item-cmd-why">sage why &lt;target&gt;</a></li>
+              <li><a class="nav-link" href="#item-cmd-ui">sage ui</a></li>
               <li><a class="nav-link" href="#item-cmd-overview">sage overview</a></li>
               <li><a class="nav-link" href="#item-cmd-query">sage query &lt;sql&gt;</a></li>
             </ul>
@@ -237,8 +236,8 @@
        [.github/sage/sage.db (Local SQLite)]
            ┌───────────┴───────────┐
            ▼                       ▼
-    [Human CLI]               [AI Assistants]
-(sage who / why)       (Skills & MCP Server: Cursor, Claude, Antigravity)</code></pre>
+     [Interactive UI]               [AI Assistants]
+        (sage ui)            (Skills & REST API: Cursor, Claude, Antigravity)</code></pre>
           </div>
         </section>
 
@@ -261,16 +260,16 @@
             Builds or updates the embedded knowledge graph inside <code>.github/sage/sage.db</code> in seconds.
           </p>
 
-          <h5>3. Ask Sage questions immediately</h5>
+          <h5>3. Explore your codebase</h5>
           <div class="docs-code-block">
-            <pre><code class="language-bash"># Find who knows a file or module best
-sage who internal/auth/token.go
-
-# Trace why a piece of code or workaround exists
-sage why internal/auth/token.go
+            <pre><code class="language-bash"># Launch the interactive architecture visualizer
+sage ui
 
 # Get a compact summary of repository knowledge
-sage overview</code></pre>
+sage overview
+
+# Query knowledge or search stored records
+sage query "auth"</code></pre>
           </div>
         </section>
       </article>
@@ -293,7 +292,7 @@ sage overview</code></pre>
         <section class="docs-section" id="item-why-skills">
           <h2 class="section-heading">Why Agent Skills?</h2>
           <p>
-            When an AI assistant has a <strong>Skill</strong> installed, it understands what CLI tools and commands exist on your machine. Rather than filling your precious LLM prompt context window with thousands of lines of Git logs, the agent executes targeted queries like <code>sage who &lt;file&gt;</code> or <code>sage why &lt;file&gt;</code> on demand!
+            When an AI assistant has a <strong>Skill</strong> installed, it understands what CLI tools and commands exist on your machine. Rather than filling your precious LLM prompt context window with thousands of lines of Git logs, the agent inspects the architecture graph and queries file details via <code>sage ui --no-browser</code> or targeted SQL queries via <code>sage query</code> on demand!
           </p>
 
           <div class="callout-block callout-block-info">
@@ -415,23 +414,20 @@ Run to get compact statistics and architecture knowledge without bloating your p
 sage overview
 ```
 
-### 2. Ownership &amp; Tribal Knowledge Lookup
-Run to find who is formally responsible (`CODEOWNERS`) and who actually knows the code (recency-decay commit scoring):
+### 2. Interactive Architecture Visualizer &amp; REST API
+Launch the local web visualizer and embedded REST endpoints:
 ```bash
-sage who &lt;path-to-file-or-dir&gt;
+sage ui
 ```
-*Example:* `sage who internal/auth/`  
-*Result:* Returns formal owner and top recent active contributors.
+Flags:
+- `--port &lt;number&gt;`: Port to run the server on (default: `8080` or next open port).
+- `--no-browser`: Start the server without automatically launching the browser.
 
-### 3. Decision Lineage &amp; "Why" Trace
-Run to find out why a line of code, file, or architectural pattern was created:
-```bash
-sage why &lt;file-path-or-commit-sha&gt;
-```
-*Example:* `sage why internal/config/config.go`  
-*Result:* Returns commit history, linked PR discussions, and synthesized decision rationale.
+**API Endpoints:**
+- `GET http://127.0.0.1:8080/api/graph`: Returns domain clusters, member files, and dependency edges.
+- `GET http://127.0.0.1:8080/api/file?path=&lt;path&gt;`: Returns detailed inspection data (role, exports, dependencies, owner, experts, decision lineage).
 
-### 4. Custom SQL &amp; Record Queries
+### 3. Custom SQL &amp; Record Queries
 Run targeted queries directly against `.github/sage/sage.db`:
 ```bash
 sage query "SELECT name, email, recency_score FROM people ORDER BY recency_score DESC LIMIT 5"
@@ -439,14 +435,7 @@ sage query "SELECT name, email, recency_score FROM people ORDER BY recency_score
 Or search for keyword records:
 ```bash
 sage query "auth"
-```
-
-## MCP Tools Integration
-When Sage is running as an MCP server (`sage mcp`) in Cursor, Claude Code, or Antigravity:
-- `sage_who_owns`: Pass `{"path": "internal/auth"}` to look up owners &amp; experts.
-- `sage_why`: Pass `{"target": "internal/auth/token.go"}` to trace decisions and PR discussions.
-- `sage_overview`: Call to get repository graph statistics.
-- `sage_query`: Pass `{"query": "..."}` for SQL queries and knowledge search.</code></pre>
+```</code></pre>
           </div>
         </section>
 
@@ -828,27 +817,11 @@ sage sync --full</code></pre>
           </div>
         </section>
 
-        <section class="docs-section" id="item-cmd-who">
-          <h2 class="section-heading"><code>sage who &lt;path&gt;</code></h2>
-          <p>Returns the formal owner (from CODEOWNERS) and top recent active experts (based on recency-decay scoring).</p>
+        <section class="docs-section" id="item-cmd-ui">
+          <h2 class="section-heading"><code>sage ui [--port &lt;number&gt;] [--no-browser]</code></h2>
+          <p>Launches the local interactive architecture visualizer web UI with embedded static assets and REST API endpoints (<code>/api/graph</code>, <code>/api/file</code>) for inspecting domain clusters, file owners, experts, and decision lineage.</p>
           <div class="docs-code-block">
-            <pre><code class="language-bash">sage who internal/auth/token.go</code></pre>
-          </div>
-          <div class="docs-code-block">
-            <pre><code class="language-plaintext">📂 Path: internal/auth/token.go
-─────────────────────────────────────────────
-👑 Formal Owner:  @security-team
-🧠 Recent Experts:
-   • Sarah Chen &lt;sarah@company.com&gt; (Score: 8.42)
-   • Alex Rivera &lt;alex@company.com&gt; (Score: 4.15)</code></pre>
-          </div>
-        </section>
-
-        <section class="docs-section" id="item-cmd-why">
-          <h2 class="section-heading"><code>sage why &lt;target&gt;</code></h2>
-          <p>Traces the decision lineage of a file, directory, or commit SHA back to PR discussions and synthesized team rationale.</p>
-          <div class="docs-code-block">
-            <pre><code class="language-bash">sage why internal/auth/token.go</code></pre>
+            <pre><code class="language-bash">sage ui --port 8080</code></pre>
           </div>
         </section>
 
@@ -928,7 +901,7 @@ sage query "SELECT name, email, recency_score FROM people ORDER BY recency_score
           <h2 class="section-heading">Offline Operation</h2>
           <p>
             <strong>Can Sage be used without any LLM API key or internet access?</strong><br>
-            <strong>Yes!</strong> All Git history indexing, recency-decay expertise calculation, CODEOWNERS lookup, <code>sage who</code>, <code>sage overview</code>, and MCP queries function 100% offline without any API keys or network requests.
+            <strong>Yes!</strong> All Git history indexing, recency-decay expertise calculation, CODEOWNERS lookup, <code>sage ui</code>, <code>sage overview</code>, and <code>sage query</code> function 100% offline without any API keys or network requests.
           </p>
         </section>
       </article>
@@ -963,7 +936,7 @@ sage query "SELECT name, email, recency_score FROM people ORDER BY recency_score
             <li><strong>Single-File SQLite Knowledge Engine:</strong> Self-contained zero-dependency storage inside <code>.github/sage/sage.db</code>.</li>
             <li><strong>AI Coding Agent Skills:</strong> Automatic discovery &amp; installation for Cursor, Claude Code, Antigravity, GitHub Copilot, and Windsurf.</li>
             <li><strong>GitHub Marketplace Action:</strong> Official <code>diamondosas/sage@v1</code> action with scheduled cron job and PR sync support.</li>
-            <li><strong>Native MCP Server:</strong> Built-in Model Context Protocol server (<code>sage mcp</code>) over stdio.</li>
+            <li><strong>Interactive Architecture Visualizer:</strong> Built-in web visualizer (<code>sage ui</code>) and embedded REST API.</li>
             <li><strong>Recency-Decay Expertise:</strong> Exponential decay scoring combining commit frequency with recency.</li>
             <li><strong>Decision Lineage Trace:</strong> Multi-hop resolution connecting code to PR discussions and team rationale.</li>
           </ul>
