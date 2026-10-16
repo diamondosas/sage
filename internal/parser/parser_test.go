@@ -191,6 +191,29 @@ func TestParseFile(t *testing.T) {
 	}
 }
 
+// TestParseUnsupportedShape verifies that unknown shape keywords trigger a warning.
+func TestParseUnsupportedShape(t *testing.T) {
+	input := `hexagon poly "Hexagon Service" [blue]`
+	g := Parse(input)
+
+	if len(g.Nodes) != 0 {
+		t.Fatalf("expected 0 valid nodes for unsupported shape, got: %+v", g.Nodes)
+	}
+	if len(g.Warnings) == 0 {
+		t.Fatalf("expected warning for unsupported shape, got none")
+	}
+}
+
+// TestParseInlineFenceMention verifies that mentioning ```sage inline doesn't drop content.
+func TestParseInlineFenceMention(t *testing.T) {
+	input := "Note: you can write ```sage in documents.\nrect svc \"Service\"\n"
+	g := Parse(input)
+	if len(g.Nodes) != 1 || g.Nodes[0].ID != "svc" {
+		t.Fatalf("expected raw parsing to extract node when no actual fence exists, got: %+v", g.Nodes)
+	}
+}
+
+
 
 
 

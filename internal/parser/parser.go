@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
-// Fallback configuration for undefined node references.
-// Change these default variables if a different fallback shape or accent color is preferred.
+// Configuration variables and default visual attributes.
+// Change these default variables if alternate behavior or styling is desired:
+// - FallbackNodeShape: shape used when synthesizing undeclared edge endpoint references (default: ShapeRect).
+// - FallbackNodeColor: palette color used when synthesizing undeclared edge endpoint references (default: "gray").
+// - Default shape dimensions (width/height): configured in the visualizer UI layer (see ui/js/app.js: SHAPE_DIMENSIONS).
 const (
 	FallbackNodeShape = ShapeRect
 	FallbackNodeColor = "gray"
@@ -44,7 +47,7 @@ func normalizeShape(raw string) (ShapeType, bool) {
 }
 
 // extractContent extracts text within ```sage ... ``` markdown code blocks if present.
-// If no code fence is found, it returns the raw input unmodified.
+// If no code fence is found or the fence contains no statements, it returns the raw input unmodified.
 func extractContent(input string) string {
 	if !strings.Contains(input, "```sage") {
 		return input
@@ -53,11 +56,13 @@ func extractContent(input string) string {
 	var sb strings.Builder
 	lines := strings.Split(input, "\n")
 	insideFence := false
+	foundFence := false
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "```sage") {
 			insideFence = true
+			foundFence = true
 			continue
 		}
 		if insideFence && strings.HasPrefix(trimmed, "```") {
@@ -69,6 +74,10 @@ func extractContent(input string) string {
 			sb.WriteString(line)
 			sb.WriteString("\n")
 		}
+	}
+
+	if !foundFence || strings.TrimSpace(sb.String()) == "" {
+		return input
 	}
 
 	return sb.String()
