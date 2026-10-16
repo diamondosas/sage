@@ -1,433 +1,231 @@
-package ui
+package ui_test
 
 import (
-	"context"
+	"bufio"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"sage/internal/ai"
-	"sage/internal/git"
-	"sage/internal/github"
-	"sage/internal/graph"
+	"sage/internal/parser"
+	internalui "sage/internal/ui"
 )
 
-func TestStaticAssetDelivery(t *testing.T) {
-	tmpDir := t.TempDir()
-	engine, err := graph.NewEngine(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create test engine: %v", err)
+// setupTestDiagram creates a temporary SAGE.md file for testing.
+func setupTestDiagram(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "SAGE.md")
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test diagram file: %v", err)
 	}
-	defer engine.Close()
+	return filePath
+}
 
-	srv := NewServer(ServerConfig{
-		Engine: engine,
+func TestServer_APIGraph(t *testing.T) {
+	content := `
+rect auth "Auth Service" [blue]
+rect api "API Gateway" [green]
+api -> auth "validates token"
+`
+	filePath := setupTestDiagram(t, content)
+	server := internalui.NewServer(internalui.Config{
+		FilePath: filePath,
 	})
 
-	// 1. Verify index.html
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	contentType := rec.Header().Get("Content-Type")
+	if !strings.HasPrefix(contentType, "application/json") {
+		t.Fatalf("expected application/json, got %s", contentType)
+	}
+
+	var graph parser.Graph
+	if err := json.NewDecoder(rec.Body).Decode(&graph); err != nil {
+		t.Fatalf("failed to decode json response: %v", err)
+	}
+
+	if len(graph.Nodes) != 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(graph.Nodes))
+	}
+	if len(graph.Edges) != 1 {
+		t.Fatalf("expected 1 edge, got %d", len(graph.Edges))
+	}
+	if graph.Nodes[0].ID != "auth" || graph.Nodes[1].ID != "api" {
+		t.Fatalf("unexpected nodes: %+v", graph.Nodes)
+	}
+	if graph.Edges[0].From != "api" || graph.Edges[0].To != "auth" {
+		t.Fatalf("unexpected edges: %+v", graph.Edges)
+	}
+}
+
+func TestServer_Index(t *testing.T) {
+	content := `rect core "Core Service" [yellow]`
+	filePath := setupTestDiagram(t, content)
+	server := internalui.NewServer(internalui.Config{
+		FilePath: filePath,
+	})
+
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	srv.Handler().ServeHTTP(rec, req)
+	server.Handler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Sage Architecture Visualizer") {
-		t.Fatalf("expected body to contain visualizer title, got: %s", body)
+	if !strings.Contains(body, "sage-canvas") {
+		t.Errorf("expected HTML to contain sage-canvas element, got:\n%s", body)
 	}
-	requiredElements := []string{
-		"theme-toggle",
-		"search-input",
-		"arch-graph",
-		"cluster-view",
-		"detail-drawer",
-	}
-	for _, el := range requiredElements {
-		if !strings.Contains(body, el) {
-			t.Errorf("expected index.html to contain element id %q", el)
-		}
-	}
-
-	// 2. Verify style.css
-	recCSS := httptest.NewRecorder()
-	reqCSS := httptest.NewRequest(http.MethodGet, "/style.css", nil)
-	srv.Handler().ServeHTTP(recCSS, reqCSS)
-
-	if recCSS.Code != http.StatusOK {
-		t.Fatalf("expected status 200 for /style.css, got %d", recCSS.Code)
-	}
-	cssBody := recCSS.Body.String()
-	if !strings.Contains(cssBody, "--bg-primary") || !strings.Contains(cssBody, "--text-primary") {
-		t.Errorf("expected style.css to define theme custom properties")
-	}
-
-	// 3. Verify app.js
-	recJS := httptest.NewRecorder()
-	reqJS := httptest.NewRequest(http.MethodGet, "/app.js", nil)
-	srv.Handler().ServeHTTP(recJS, reqJS)
-
-	if recJS.Code != http.StatusOK {
-		t.Fatalf("expected status 200 for /app.js, got %d", recJS.Code)
-	}
-	jsBody := recJS.Body.String()
-	if !strings.Contains(jsBody, "/api/graph") || !strings.Contains(jsBody, "/api/file") {
-		t.Errorf("expected app.js to fetch from /api/graph and /api/file")
+	if !strings.Contains(body, "Core Service") && !strings.Contains(body, "core") {
+		t.Errorf("expected HTML to contain diagram data, got:\n%s", body)
 	}
 }
 
-func TestVisualizerFrontendFeatures(t *testing.T) {
-	srv := NewServer(ServerConfig{
-		Engine: nil,
+func TestServer_StaticAssets(t *testing.T) {
+	filePath := setupTestDiagram(t, "")
+	server := internalui.NewServer(internalui.Config{
+		FilePath: filePath,
 	})
 
-	// Test CSS features: Dark mode, drawer transitions, and responsive grid
-	recCSS := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(recCSS, httptest.NewRequest(http.MethodGet, "/style.css", nil))
-	css := recCSS.Body.String()
-
-	cssFeatures := []string{
-		`[data-theme="dark"]`,
-		`#detail-drawer`,
-		`.cluster-node-group`,
-		`.files-grid`,
-		`.file-card`,
-		`.role-badge`,
-	}
-	for _, feat := range cssFeatures {
-		if !strings.Contains(css, feat) {
-			t.Errorf("expected style.css to contain %q", feat)
-		}
+	staticPaths := []string{
+		"/static/css/tailwind.min.css",
+		"/static/js/libs/rough.js",
+		"/static/js/libs/dagre.min.js",
+		"/static/js/app.js",
 	}
 
-	// Test JS features: SVG layout, click-to-drill-down, search filtering, why lineage, drawer rendering
-	recJS := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(recJS, httptest.NewRequest(http.MethodGet, "/app.js", nil))
-	js := recJS.Body.String()
+	for _, path := range staticPaths {
+		t.Run(path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			server.Handler().ServeHTTP(rec, req)
 
-	jsFeatures := []string{
-		"openClusterView",
-		"openFileDrawer",
-		"performSearch",
-		"highlightConnections",
-		"renderDrawerDetails",
-		"Why Lineage",
-	}
-	for _, feat := range jsFeatures {
-		if !strings.Contains(js, feat) {
-			t.Errorf("expected app.js to contain %q", feat)
-		}
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected status 200 for %s, got %d", path, rec.Code)
+			}
+			if rec.Body.Len() == 0 {
+				t.Fatalf("expected non-empty body for %s", path)
+			}
+		})
 	}
 }
 
-func TestGetGraphEndpoint(t *testing.T) {
-	tmpDir := t.TempDir()
-	engine, err := graph.NewEngine(tmpDir)
+func TestServer_SSE_LiveReload(t *testing.T) {
+	filePath := setupTestDiagram(t, `rect init "Initial Node"`)
+	// Use small watch ticker for fast test execution
+	server := internalui.NewServer(internalui.Config{
+		FilePath:      filePath,
+		CheckInterval: 50 * time.Millisecond,
+	})
+
+	ts := httptest.NewServer(server.Handler())
+	defer ts.Close()
+
+	client := ts.Client()
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/events", nil)
 	if err != nil {
-		t.Fatalf("failed to create test engine: %v", err)
-	}
-	defer engine.Close()
-
-	// Seed files into the SQLite database
-	analyses := []ai.FileAnalysis{
-		{
-			Path:         "cmd/sage/main.go",
-			Summary:      "CLI entrypoint",
-			Role:         "CLI Handler",
-			Exports:      []string{"main"},
-			Dependencies: []string{"internal/graph"},
-			Hash:         "hash1",
-			UpdatedAt:    time.Now(),
-		},
-		{
-			Path:         "internal/graph/sqlite.go",
-			Summary:      "Graph storage engine",
-			Role:         "Knowledge Graph Storage",
-			Exports:      []string{"NewEngine", "QueryArchitectureGraph"},
-			Dependencies: []string{"internal/ai"},
-			Hash:         "hash2",
-			UpdatedAt:    time.Now(),
-		},
-	}
-	if err := engine.IngestFileAnalysis(analyses); err != nil {
-		t.Fatalf("failed to ingest file analyses: %v", err)
+		t.Fatalf("failed to create SSE request: %v", err)
 	}
 
-	srv := NewServer(ServerConfig{
-		Engine: engine,
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-
-	contentType := rec.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") {
-		t.Fatalf("expected application/json Content-Type, got %s", contentType)
-	}
-
-	var res graph.ArchitectureGraph
-	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
-		t.Fatalf("failed to parse json response: %v", err)
-	}
-
-	if res.TotalFiles != 2 {
-		t.Fatalf("expected 2 total files, got %d", res.TotalFiles)
-	}
-
-	if len(res.Clusters) == 0 {
-		t.Fatalf("expected at least one cluster, got none")
-	}
-
-	// Verify edges were extracted
-	if len(res.Edges) == 0 {
-		t.Fatalf("expected dependency edges between clusters, got 0")
-	}
-}
-
-func TestGetGraphEndpoint_NilEngine(t *testing.T) {
-	srv := NewServer(ServerConfig{
-		Engine: nil,
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500 when engine is nil, got %d", rec.Code)
-	}
-}
-
-func TestGetFileEndpoint_Success(t *testing.T) {
-	tmpDir := t.TempDir()
-	engine, err := graph.NewEngine(tmpDir)
+	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("failed to create test engine: %v", err)
+		t.Fatalf("SSE request failed: %v", err)
 	}
-	defer engine.Close()
+	defer resp.Body.Close()
 
-	targetFile := "internal/graph/sqlite.go"
-
-	// 1. Ingest File Analysis
-	analyses := []ai.FileAnalysis{
-		{
-			Path:         targetFile,
-			Summary:      "Graph persistence layer for SQLite",
-			Role:         "Knowledge Graph Storage",
-			Exports:      []string{"NewEngine", "QueryWhy", "QueryArchitectureGraph"},
-			Dependencies: []string{"database/sql", "sage/internal/ai"},
-			Hash:         "hash123",
-			UpdatedAt:    time.Now(),
-		},
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200 for SSE, got %d", resp.StatusCode)
 	}
-	if err := engine.IngestFileAnalysis(analyses); err != nil {
-		t.Fatalf("failed to ingest file analysis: %v", err)
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("expected text/event-stream Content-Type, got %s", ct)
 	}
 
-	// 2. Ingest Codeowners
-	rules := []git.OwnershipRule{
-		{
-			Pattern: "internal/graph/*",
-			Owners:  []string{"@graph-maintainers"},
-		},
-	}
-	if err := engine.IngestCodeowners(rules); err != nil {
-		t.Fatalf("failed to ingest codeowners: %v", err)
+	// Trigger file update by modifying the file
+	time.Sleep(75 * time.Millisecond)
+	newContent := `rect init "Initial Node"` + "\n" + `circle new "New Node"`
+	if err := os.WriteFile(filePath, []byte(newContent), 0644); err != nil {
+		t.Fatalf("failed to update test diagram: %v", err)
 	}
 
-	// 3. Ingest Git History & Experts
-	commits := []git.Commit{
-		{
-			SHA:         "c1234567890abcdef",
-			Message:     "feat(graph): add sqlite engine",
-			AuthorName:  "Grace Hopper",
-			AuthorEmail: "grace@navy.mil",
-			Timestamp:   time.Now(),
-			Files:       []string{targetFile},
-		},
-	}
-	expertise := map[string][]git.ContributorExpertise{
-		targetFile: {
-			{
-				AuthorName:  "Grace Hopper",
-				AuthorEmail: "grace@navy.mil",
-				Score:       42.5,
-				CommitCount: 5,
-			},
-		},
-	}
-	if err := engine.IngestGitHistory(commits, expertise); err != nil {
-		t.Fatalf("failed to ingest git history: %v", err)
-	}
+	// Read SSE response stream
+	reader := bufio.NewReader(resp.Body)
+	receivedReload := false
 
-	// 4. Ingest Decisions
-	prs := []github.PullRequest{
-		{Number: 42, Title: "Adopt SQLite embedded store", URL: "https://github.com/pull/42", Author: "grace"},
-	}
-	decisions := []ai.Decision{
-		{
-			ID:        "DEC-042",
-			Title:     "SQLite Embedded Architecture",
-			Rationale: "Eliminates Docker/network daemon dependencies",
-			AppliesTo: []string{targetFile},
-		},
-	}
-	if err := engine.IngestDecisions(prs, decisions); err != nil {
-		t.Fatalf("failed to ingest decisions: %v", err)
-	}
-
-	srv := NewServer(ServerConfig{
-		Engine: engine,
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/file?path="+targetFile, nil)
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-
-	contentType := rec.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") {
-		t.Fatalf("expected application/json Content-Type, got %s", contentType)
-	}
-
-	var details FileInspectionDetails
-	if err := json.Unmarshal(rec.Body.Bytes(), &details); err != nil {
-		t.Fatalf("failed to parse json response: %v", err)
-	}
-
-	if details.Path != targetFile {
-		t.Errorf("expected path %s, got %s", targetFile, details.Path)
-	}
-	if details.Role != "Knowledge Graph Storage" {
-		t.Errorf("expected role Knowledge Graph Storage, got %s", details.Role)
-	}
-	if !strings.Contains(details.Summary, "Graph persistence") {
-		t.Errorf("expected summary to contain 'Graph persistence', got %s", details.Summary)
-	}
-	if len(details.Exports) != 3 {
-		t.Errorf("expected 3 exports, got %d", len(details.Exports))
-	}
-	if len(details.Dependencies) != 2 {
-		t.Errorf("expected 2 dependencies, got %d", len(details.Dependencies))
-	}
-	if details.Owner != "@graph-maintainers" {
-		t.Errorf("expected owner @graph-maintainers, got %s", details.Owner)
-	}
-	if len(details.Experts) == 0 || !strings.Contains(details.Experts[0], "Grace Hopper") {
-		t.Errorf("expected Grace Hopper in experts, got %v", details.Experts)
-	}
-	if len(details.Why) == 0 {
-		t.Errorf("expected why lineage entries, got empty")
-	}
-}
-
-func TestGetFileEndpoint_MissingPath(t *testing.T) {
-	srv := NewServer(ServerConfig{
-		Engine: nil,
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/file", nil)
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400 for missing path, got %d", rec.Code)
-	}
-}
-
-func TestGetFileEndpoint_NotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	engine, err := graph.NewEngine(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create test engine: %v", err)
-	}
-	defer engine.Close()
-
-	srv := NewServer(ServerConfig{
-		Engine: engine,
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/file?path=nonexistent/file.go", nil)
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404 for nonexistent file, got %d", rec.Code)
-	}
-}
-
-func TestServer_LifecycleAndGracefulShutdown(t *testing.T) {
-	tmpDir := t.TempDir()
-	engine, err := graph.NewEngine(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create test engine: %v", err)
-	}
-	defer engine.Close()
-
-	srv := NewServer(ServerConfig{
-		Port:   0, // Ephemeral port
-		Host:   "127.0.0.1",
-		Engine: engine,
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	errCh := make(chan error, 1)
+	readChan := make(chan string, 10)
 	go func() {
-		errCh <- srv.Start(ctx)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			readChan <- line
+		}
 	}()
 
-	// Wait for server to bind port
-	var addr string
-	for i := 0; i < 50; i++ {
-		addr = srv.Addr()
-		if addr != "" {
-			break
+	timeout := time.After(2 * time.Second)
+	for !receivedReload {
+		select {
+		case line := <-readChan:
+			if strings.Contains(line, "event: reload") || strings.Contains(line, "reload") {
+				receivedReload = true
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for SSE reload event")
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
-	if addr == "" {
-		t.Fatalf("server failed to bind address in time")
+}
+
+func TestServer_NonExistentFile(t *testing.T) {
+	server := internalui.NewServer(internalui.Config{
+		FilePath: "/path/to/nonexistent/SAGE.md",
+	})
+
+	// /api/graph should return 200 with warnings
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	if srv.Port() <= 0 {
-		t.Fatalf("expected positive port number, got %d", srv.Port())
+	var g parser.Graph
+	if err := json.NewDecoder(rec.Body).Decode(&g); err != nil {
+		t.Fatalf("failed to decode graph: %v", err)
+	}
+	if len(g.Warnings) == 0 {
+		t.Errorf("expected warning for missing file")
 	}
 
-	// Verify server responds to live HTTP request
-	resp, err := http.Get(fmt.Sprintf("http://%s/api/graph", addr))
-	if err != nil {
-		t.Fatalf("failed to make HTTP GET request to server: %v", err)
+	// Index should also serve without crashing
+	recIndex := httptest.NewRecorder()
+	reqIndex := httptest.NewRequest(http.MethodGet, "/", nil)
+	server.Handler().ServeHTTP(recIndex, reqIndex)
+	if recIndex.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for index, got %d", recIndex.Code)
 	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 OK from running server, got %d", resp.StatusCode)
-	}
+}
 
-	// Trigger graceful shutdown via context cancellation
-	cancel()
+func TestServer_NotFound(t *testing.T) {
+	server := internalui.NewServer(internalui.Config{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/non-existent-page", nil)
+	server.Handler().ServeHTTP(rec, req)
 
-	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Fatalf("expected clean shutdown, got error: %v", err)
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatalf("server did not shut down gracefully within timeout")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown path, got %d", rec.Code)
 	}
 }
 
