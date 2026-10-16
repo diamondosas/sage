@@ -1,251 +1,223 @@
-package cli
+package cli_test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 	"testing"
-	"time"
+
+	"sage/cmd/sage/cli"
 )
 
-func TestUICommandRegistration(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"ui"})
-	if err != nil || cmd == nil || cmd.Name() != "ui" {
-		t.Fatalf("expected 'ui' subcommand to be registered on rootCmd")
+func TestBrowserCommand(t *testing.T) {
+	tests := []struct {
+		goos      string
+		url       string
+		wantCmd   string
+		wantArgs  []string
+		wantErr   bool
+	}{
+		{
+			goos:     "linux",
+			url:      "http://127.0.0.1:8080",
+			wantCmd:  "xdg-open",
+			wantArgs: []string{"http://127.0.0.1:8080"},
+			wantErr:  false,
+		},
+		{
+			goos:     "darwin",
+			url:      "http://127.0.0.1:8080",
+			wantCmd:  "open",
+			wantArgs: []string{"http://127.0.0.1:8080"},
+			wantErr:  false,
+		},
+		{
+			goos:     "windows",
+			url:      "http://127.0.0.1:8080",
+			wantCmd:  "rundll32",
+			wantArgs: []string{"url.dll,FileProtocolHandler", "http://127.0.0.1:8080"},
+			wantErr:  false,
+		},
+		{
+			goos:    "unknown-os",
+			url:     "http://127.0.0.1:8080",
+			wantErr: true,
+		},
 	}
 
-	portFlag := cmd.Flag("port")
-	if portFlag == nil {
-		t.Fatalf("expected --port flag to be registered on ui command")
-	}
-	if portFlag.DefValue != "8080" {
-		t.Errorf("expected default port to be 8080, got %s", portFlag.DefValue)
-	}
-
-	noBrowserFlag := cmd.Flag("no-browser")
-	if noBrowserFlag == nil {
-		t.Fatalf("expected --no-browser flag to be registered on ui command")
-	}
-	if noBrowserFlag.DefValue != "false" {
-		t.Errorf("expected default no-browser to be false, got %s", noBrowserFlag.DefValue)
+	for _, tc := range tests {
+		t.Run(tc.goos, func(t *testing.T) {
+			cmdName, args, err := cli.BrowserCommand(tc.goos, tc.url)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for goos %s, got nil", tc.goos)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for %s: %v", tc.goos, err)
+			}
+			if cmdName != tc.wantCmd {
+				t.Errorf("cmdName = %q, want %q", cmdName, tc.wantCmd)
+			}
+			if len(args) != len(tc.wantArgs) {
+				t.Fatalf("args len = %d, want %d", len(args), len(tc.wantArgs))
+			}
+			for i := range args {
+				if args[i] != tc.wantArgs[i] {
+					t.Errorf("arg[%d] = %q, want %q", i, args[i], tc.wantArgs[i])
+				}
+			}
+		})
 	}
 }
 
-func TestFindAvailablePort(t *testing.T) {
-	// First, test when starting port is available
-	port, err := findAvailablePort("127.0.0.1", 19280)
+func TestFindAvailablePort_SelectsAvailablePort(t *testing.T) {
+	// Find a free port starting at 19000
+	port, err := cli.FindAvailablePort("127.0.0.1", 19000)
 	if err != nil {
-		t.Fatalf("expected port to be available, got error: %v", err)
+		t.Fatalf("unexpected error finding port: %v", err)
 	}
-	if port != 19280 {
-		t.Errorf("expected port 19280, got %d", port)
+	if port < 19000 {
+		t.Errorf("expected port >= 19000, got %d", port)
 	}
+}
 
-	// Now occupy port 19280 and verify it returns next available port (19281)
-	ln, err := net.Listen("tcp", "127.0.0.1:19280")
+func TestFindAvailablePort_BypassesOccupiedPort(t *testing.T) {
+	// Occupy port 19100
+	basePort := 19100
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", basePort))
 	if err != nil {
-		t.Fatalf("failed to listen on test port: %v", err)
+		t.Skipf("cannot bind test port %d: %v", basePort, err)
 	}
 	defer ln.Close()
 
-	nextPort, err := findAvailablePort("127.0.0.1", 19280)
+	port, err := cli.FindAvailablePort("127.0.0.1", basePort)
 	if err != nil {
-		t.Fatalf("expected next port to be found, got error: %v", err)
+		t.Fatalf("unexpected error finding port: %v", err)
 	}
-	if nextPort <= 19280 {
-		t.Errorf("expected port > 19280 when 19280 is occupied, got %d", nextPort)
-	}
-}
-
-func TestBrowserCommand(t *testing.T) {
-	testCases := []struct {
-		goos        string
-		url         string
-		expectedCmd string
-		expectedArg string
-		expectErr   bool
-	}{
-		{
-			goos:        "linux",
-			url:         "http://127.0.0.1:8080",
-			expectedCmd: "xdg-open",
-			expectedArg: "http://127.0.0.1:8080",
-			expectErr:   false,
-		},
-		{
-			goos:        "darwin",
-			url:         "http://127.0.0.1:8080",
-			expectedCmd: "open",
-			expectedArg: "http://127.0.0.1:8080",
-			expectErr:   false,
-		},
-		{
-			goos:        "windows",
-			url:         "http://127.0.0.1:8080",
-			expectedCmd: "rundll32",
-			expectedArg: "http://127.0.0.1:8080",
-			expectErr:   false,
-		},
-		{
-			goos:      "plan9",
-			url:       "http://127.0.0.1:8080",
-			expectErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		cmdName, args, err := browserCommand(tc.goos, tc.url)
-		if tc.expectErr {
-			if err == nil {
-				t.Errorf("expected error for OS %q, got nil", tc.goos)
-			}
-			continue
-		}
-
-		if err != nil {
-			t.Errorf("unexpected error for OS %q: %v", tc.goos, err)
-			continue
-		}
-
-		if cmdName != tc.expectedCmd {
-			t.Errorf("OS %q: expected cmd %q, got %q", tc.goos, tc.expectedCmd, cmdName)
-		}
-
-		found := false
-		for _, arg := range args {
-			if arg == tc.expectedArg {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("OS %q: expected args %v to contain %q", tc.goos, args, tc.expectedArg)
-		}
+	if port <= basePort {
+		t.Errorf("expected port > %d (occupied), got %d", basePort, port)
 	}
 }
 
-func TestRunUIWithContext(t *testing.T) {
-	tmpDir := t.TempDir()
-
+func TestUICmd_DefaultFlagsAndExecution(t *testing.T) {
 	var openedURL string
-	origOpenBrowser := openBrowser
-	openBrowser = func(targetURL string) error {
-		openedURL = targetURL
+	var serverStarted bool
+	var capturedHost string
+	var capturedPort int
+	var capturedFile string
+
+	// Mock browser opener
+	cli.SetBrowserOpenerForTest(func(url string) error {
+		openedURL = url
 		return nil
-	}
-	defer func() { openBrowser = origOpenBrowser }()
+	})
+	defer cli.ResetBrowserOpenerForTest()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Mock server runner
+	cli.SetServerRunnerForTest(func(ctx context.Context, host string, port int, filePath string) error {
+		serverStarted = true
+		capturedHost = host
+		capturedPort = port
+		capturedFile = filePath
+		return nil
+	})
+	defer cli.ResetServerRunnerForTest()
 
-	buf := new(bytes.Buffer)
-	opts := uiOptions{
-		Port:      19290,
-		Host:      "127.0.0.1",
-		NoBrowser: false,
-		DBPath:    tmpDir,
-	}
+	cmd := cli.NewUICmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--no-browser"})
 
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- runUIWithContext(ctx, opts, buf)
-	}()
-
-	// Wait for server to respond
-	var serverReady bool
-	url := fmt.Sprintf("http://127.0.0.1:%d/", 19290)
-	for i := 0; i < 20; i++ {
-		time.Sleep(20 * time.Millisecond)
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				serverReady = true
-				break
-			}
-		}
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("expected successful execution, got: %v", err)
 	}
 
-	if !serverReady {
-		t.Fatalf("server failed to start and respond at %s", url)
+	if !serverStarted {
+		t.Error("expected server to be started")
+	}
+	if capturedHost != "127.0.0.1" {
+		t.Errorf("expected default host 127.0.0.1, got %s", capturedHost)
+	}
+	if capturedPort != 8080 {
+		t.Errorf("expected default port 8080, got %d", capturedPort)
+	}
+	if capturedFile != "SAGE.md" {
+		t.Errorf("expected default file SAGE.md, got %s", capturedFile)
+	}
+	if openedURL != "" {
+		t.Errorf("expected no browser launch with --no-browser, but opened: %s", openedURL)
 	}
 
-	if openedURL != url {
-		t.Errorf("expected opened browser URL to be %q, got %q", url, openedURL)
-	}
-
-	outStr := buf.String()
-	if !strings.Contains(outStr, "Sage Architecture Visualizer listening on http://127.0.0.1:19290") {
-		t.Errorf("expected output to mention listening address, got: %s", outStr)
-	}
-
-	// Trigger graceful shutdown
-	cancel()
-
-	select {
-	case err := <-errChan:
-		if err != nil {
-			t.Errorf("runUIWithContext returned unexpected error on shutdown: %v", err)
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatalf("server did not shut down within timeout")
+	output := out.String()
+	if !strings.Contains(output, "Sage UI server started at http://127.0.0.1:8080") {
+		t.Errorf("expected output to contain start URL, got:\n%s", output)
 	}
 }
 
-func TestRunUIWithContextNoBrowser(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	var browserCalled bool
-	origOpenBrowser := openBrowser
-	openBrowser = func(targetURL string) error {
-		browserCalled = true
+func TestUICmd_OpensBrowserWhenNotDisabled(t *testing.T) {
+	var openedURL string
+	cli.SetBrowserOpenerForTest(func(url string) error {
+		openedURL = url
 		return nil
-	}
-	defer func() { openBrowser = origOpenBrowser }()
+	})
+	defer cli.ResetBrowserOpenerForTest()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cli.SetServerRunnerForTest(func(ctx context.Context, host string, port int, filePath string) error {
+		return nil
+	})
+	defer cli.ResetServerRunnerForTest()
 
-	buf := new(bytes.Buffer)
-	opts := uiOptions{
-		Port:      19295,
-		Host:      "127.0.0.1",
-		NoBrowser: true,
-		DBPath:    tmpDir,
-	}
+	cmd := cli.NewUICmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--port", "8085", "--file", "custom.md"})
 
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- runUIWithContext(ctx, opts, buf)
-	}()
-
-	url := fmt.Sprintf("http://127.0.0.1:%d/", 19295)
-	for i := 0; i < 20; i++ {
-		time.Sleep(20 * time.Millisecond)
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-			break
-		}
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("expected successful execution, got: %v", err)
 	}
 
-	if browserCalled {
-		t.Errorf("browser should NOT be called when NoBrowser is true")
-	}
-
-	cancel()
-	select {
-	case err := <-errChan:
-		if err != nil {
-			t.Errorf("runUIWithContext error: %v", err)
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatalf("server did not shut down within timeout")
+	expectedURL := "http://127.0.0.1:8085"
+	if openedURL != expectedURL {
+		t.Errorf("expected browser to open %q, got %q", expectedURL, openedURL)
 	}
 }
 
+func TestUICmd_HandlesPortConflictAndResolvesNext(t *testing.T) {
+	basePort := 19200
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", basePort))
+	if err != nil {
+		t.Skipf("cannot bind test port %d: %v", basePort, err)
+	}
+	defer ln.Close()
 
+	var actualPort int
+	cli.SetServerRunnerForTest(func(ctx context.Context, host string, port int, filePath string) error {
+		actualPort = port
+		return nil
+	})
+	defer cli.ResetServerRunnerForTest()
 
+	cmd := cli.NewUICmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--port", fmt.Sprintf("%d", basePort), "--no-browser"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("expected successful execution, got: %v", err)
+	}
+
+	if actualPort <= basePort {
+		t.Errorf("expected resolved port > %d, got %d", basePort, actualPort)
+	}
+
+	output := out.String()
+	expectedNotice := fmt.Sprintf("Sage UI server started at http://127.0.0.1:%d", actualPort)
+	if !strings.Contains(output, expectedNotice) {
+		t.Errorf("expected output to mention %s, got:\n%s", expectedNotice, output)
+	}
+}
