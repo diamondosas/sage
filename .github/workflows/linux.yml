@@ -24,14 +24,14 @@ jobs:
         env:
           GOOS: linux
           GOARCH: amd64
-          CGO_ENABLED: 1
+          CGO_ENABLED: 0
         run: go build -ldflags="-s -w" -v -o dist/sage-linux-amd64 ./cmd/sage
 
       - name: Build Linux arm64
         env:
           GOOS: linux
           GOARCH: arm64
-          CGO_ENABLED: 1
+          CGO_ENABLED: 0
         run: go build -ldflags="-s -w" -v -o dist/sage-linux-arm64 ./cmd/sage
 
       - name: Upload Linux Artifacts

@@ -139,11 +139,15 @@ func isAddrInUse(err error) bool {
 		if errors.Is(opErr.Err, syscall.EADDRINUSE) {
 			return true
 		}
-		if strings.Contains(strings.ToLower(opErr.Err.Error()), "address already in use") {
+		errLower := strings.ToLower(opErr.Err.Error())
+		if strings.Contains(errLower, "address already in use") ||
+			strings.Contains(errLower, "only one usage of each socket address") {
 			return true
 		}
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "address already in use")
+	errLower := strings.ToLower(err.Error())
+	return strings.Contains(errLower, "address already in use") ||
+		strings.Contains(errLower, "only one usage of each socket address")
 }
 
 // FindAvailablePort checks if host:startingPort is open. If occupied by an existing process,
