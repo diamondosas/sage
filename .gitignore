@@ -6,16 +6,6 @@ bin/*
 !bin/sage-cli.js
 dist/
 
-# Local Sage database & cache
-.github/sage/*.db-wal
-.github/sage/*.db-shm
-# BadgerDB leftover guard (project uses SQLite now)
-.github/sage/*.sst
-.github/sage/*.vlog
-.github/sage/DISCARD
-.github/sage/KEYREGISTRY
-.github/sage/MANIFEST
-
 # Environment & Secrets
 .env
 *.key
@@ -26,6 +16,8 @@ Thumbs.db
 .idea/
 .vscode/
 
+docs/agents
+.scratch/
 prompt.txt
 PLAN.md
 # SQLite temp files
