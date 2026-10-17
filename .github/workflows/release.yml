@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release (e.g. v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build cross-platform binaries
+        run: |
+          mkdir -p dist
+          
+          # Linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -v -o dist/sage-linux-amd64 ./cmd/sage
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -v -o dist/sage-linux-arm64 ./cmd/sage
+          
+          # macOS
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -v -o dist/sage-darwin-amd64 ./cmd/sage
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -v -o dist/sage-darwin-arm64 ./cmd/sage
+          
+          # Windows
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -v -o dist/sage-windows-amd64.exe ./cmd/sage
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -v -o dist/sage-windows-arm64.exe ./cmd/sage
+
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        run: |
+          sha256sum sage-* > sha256sums.txt
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          files: |
+            dist/sage-linux-amd64
+            dist/sage-linux-arm64
+            dist/sage-darwin-amd64
+            dist/sage-darwin-arm64
+            dist/sage-windows-amd64.exe
+            dist/sage-windows-arm64.exe
+            dist/sha256sums.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false
