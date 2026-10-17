@@ -1,0 +1,20 @@
+{
+  "name": "sage",
+  "version": "0.1.0",
+  "description": "Visual Architecture Mapping of Codebase to reduce technical debt",
+  "bin": {
+    "sage-install": "./assets/install.js"
+  },
+  "scripts": {
+    "postinstall": "node ./assets/install.js"
+  },
+  "keywords": [
+    "architecture",
+    "visualization",
+    "claude-skill",
+    "agent-skill",
+    "codebase-graph"
+  ],
+  "author": "diamondosas",
+  "license": "MIT"
+}

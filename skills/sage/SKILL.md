@@ -1,30 +1,27 @@
-
-You would Draw it inside 
-
-Explain as if Teaching a Child
-Remove Unnecessary Details
-Use Everyday Language 
-Break the Topic into Small Parts
-
+---
+name: sage
+description: Visual architecture mapping of codebase structure, modules, dependencies, and technical debt into SAGE.md. Use when the user asks to map architecture, visualize the codebase, inspect structural tech debt, update SAGE.md, or run the Sage CLI diagram viewer.
 ---
 
 # Sage Skill: Architecture Mapping
 
-## Mission & Rules
 Map codebase architecture into `SAGE.md` so human users can visually inspect structure and technical debt in the `sage` browser UI.
-- **Never Assume Anything**: The AI must never assume facts about the codebase. Do not guess file paths, dependencies, or patterns. Verify directly via `git status`, file reads, and imports.
-- **Pedagogical Clarity**: Explain as if teaching a child. Remove unnecessary details, use everyday language, break topics into small parts.
 
-## SAGE.md Syntax Cheat-Sheet
+
+## Mission & Rules
+1. **Never guess**: Don't assume facts about the codebase. Do not invent file paths, dependencies, or patterns if unsure. Check git status or directory trees first.
+2. **Concise explanations**: Keep commentary minimal and focused on structure.
+3. **Reference documentation**: See [references/language-syntax.md](references/language-syntax.md) for full syntax, shapes, and color rules.
+
+## SAGE.md Syntax Quick Reference
 ```sage
-// group: GroupName                  // Change group name to categorize nodes into a cluster
-// path: path/to/source              // Change path to map this cluster to actual source directory
-rect id "Simple Label" [blue]       // Change shape (rect/circle/diamond/triangle/cylinder) or [color] to alter rendering
-cylinder db "Database" [purple]     // Change [purple] to [blue/green/red/yellow/orange/gray] for different palette color
-id -> db "Reads data"               // Change arrow -> to <-> for bidirectional sync; change label for protocol
-id <-> db "Bi-directional sync"
+// group: GroupName                  // Clusters nodes into a domain group
+// path: path/to/source              // Maps group to codebase directory
+rect id "Simple Label" [blue]       // Shapes: rect, circle, diamond, triangle, cylinder
+cylinder db "Database" [purple]     // Colors: [blue/green/red/yellow/orange/purple/gray]
+id -> db "Reads data"               // Directed dependency with protocol or description
+id <-> db "Bi-directional sync"     // Bidirectional relationship
 ```
-See [lang-docs.md](../../lang-docs.md) for full language rules.
 
 ## Incremental Update Protocol
 When code changes after `SAGE.md` exists:
@@ -32,4 +29,6 @@ When code changes after `SAGE.md` exists:
 2. Run `git status` and `git diff` to locate modified files and packages.
 3. Locate corresponding `// group:` or node IDs in `SAGE.md`.
 4. Surgically update or append only the touched nodes and connections.
-5. Remind the user to run `sage` in their terminal to view the updated diagram.
+5. Remind the user to run `sage ui` in their terminal to view the interactive diagram. If `sage` is not installed on their system, tell them to install it via:
+   `curl -fsSL https://raw.githubusercontent.com/diamondosas/sage/main/assets/install.sh | sh` (or `npx sage-codebase`).
+

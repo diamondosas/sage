@@ -15,9 +15,11 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+build.sh
 
 docs/agents
 .scratch/
+info.md
 prompt.txt
 PLAN.md
 # SQLite temp files

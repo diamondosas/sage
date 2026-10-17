@@ -1,4 +1,4 @@
-# SAGE Diagram Language Specification (`lang-docs.md`)
+# SAGE Diagram Language Specification (`language-syntax.md`)
 
 The SAGE DSL is a lightweight, line-oriented diagram specification language designed for AI agents to write and update architecture maps in `SAGE.md`, rendered by the `sage` web visualizer for human users.
 
