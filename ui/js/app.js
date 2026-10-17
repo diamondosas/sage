@@ -435,6 +435,13 @@
       // Attach node drag listeners
       setupNodeDragging(nodeGroup, node);
     });
+
+    const currentSvg = document.getElementById('sage-canvas');
+    const currentVp = document.getElementById('viewport');
+    if (currentSvg && currentVp) {
+      setupActivePanZoom(currentSvg, currentVp);
+      setupActiveAnnotations(currentSvg, currentVp);
+    }
   }
 
   // =========================================================================

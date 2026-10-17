@@ -13,6 +13,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/diamondosas/sage/stargazers"><img src="https://img.shields.io/github/stars/diamondosas/sage" alt="Stars"></a>
 </p>
+[![skills.sh](https://skills.sh/b/diamondosas/sage)](https://skills.sh/diamondosas/sage)
+
 
 ---
 
@@ -22,7 +24,7 @@
 > *Drop your demo recording or high-res UI snapshot here to showcase Sage in action.*
 > 
 > ```markdown
-> ![Sage Architecture Visualizer Demo](assets/demo.gif)
+> ![Sage Architecture Visualizer Demo](assets/demo.png)
 > ```
 > *Recommended: 10-15s GIF showing `sage init` -> AI agent updating `SAGE.md` -> `sage ui` launching the interactive architecture canvas.*
 
