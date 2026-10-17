@@ -74,8 +74,7 @@
        Displays syntax warnings or fallback nodes if Graph.Warnings (or .Warnings) is non-empty.
        CUSTOMIZATION: Change alert colors (bg-amber-900/40, text-amber-200) for different alert styles -->
   {{ $warnings := or .Warnings (and .Graph .Graph.Warnings) }}
-  {{ if $warnings }}
-  <details id="warning-banner" open class="px-4 py-2 bg-amber-900/40 border-b border-amber-600/40 text-amber-200 text-xs z-10 cursor-pointer">
+  <details id="warning-banner" class="px-4 py-2 bg-amber-900/40 border-b border-amber-600/40 text-amber-200 text-xs z-10 cursor-pointer {{ if not $warnings }}hidden{{ end }}" {{ if $warnings }}open{{ end }}>
     <summary class="font-semibold uppercase tracking-wider text-[10px] bg-amber-800 text-amber-100 px-1.5 py-0.5 rounded inline-block select-none">
       ⚠️ Warnings (Click to collapse/expand)
     </summary>
@@ -85,7 +84,6 @@
       {{ end }}
     </div>
   </details>
-  {{ end }}
 
   <!-- Main Visualizer SVG Canvas Container:
        CUSTOMIZATION: Change canvas background color via bg-slate-900 -->

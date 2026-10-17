@@ -438,15 +438,49 @@
   }
 
   // =========================================================================
-  // INTERACTION: PAN & ZOOM
+  // INTERACTION: PAN, ZOOM & ANNOTATIONS (Modular Subsystems)
   // =========================================================================
 
+  let activePanZoomController = null;
+  let activeAnnotationsController = null;
+  const persistedHighlights = new Set();
+
+  function wrapInViewport(svgEl) {
+    if (!svgEl) return null;
+    let vp = svgEl.querySelector('#viewport');
+    if (vp) return vp;
+
+    vp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    vp.setAttribute('id', 'viewport');
+
+    const children = Array.from(svgEl.childNodes);
+    children.forEach(child => {
+      const tag = (child.tagName || '').toLowerCase();
+      if (tag !== 'defs' && tag !== 'style') {
+        vp.appendChild(child);
+      }
+    });
+
+    svgEl.appendChild(vp);
+    return vp;
+  }
+
   function updateTransform() {
-    if (!viewport) return;
-    viewport.setAttribute('transform', `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`);
+    if (activePanZoomController) {
+      activePanZoomController.setState(viewState);
+      return;
+    }
+    const vp = document.getElementById('viewport');
+    if (vp) {
+      vp.setAttribute('transform', `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`);
+    }
   }
 
   function resetView() {
+    if (activePanZoomController) {
+      activePanZoomController.resetView();
+      return;
+    }
     viewState.x = 0;
     viewState.y = 0;
     viewState.scale = 1;
@@ -454,11 +488,15 @@
   }
 
   function zoom(factor, clientX, clientY) {
+    if (activePanZoomController) {
+      activePanZoomController.zoom(factor, clientX, clientY);
+      return;
+    }
     const oldScale = viewState.scale;
     const newScale = Math.min(viewState.maxScale, Math.max(viewState.minScale, oldScale * factor));
     if (newScale === oldScale) return;
 
-    const activeCanvas = document.getElementById('sage-canvas') || svg;
+    const activeCanvas = document.querySelector('#diagram-stage svg') || document.getElementById('sage-canvas');
     if (clientX !== undefined && clientY !== undefined && activeCanvas) {
       const rect = activeCanvas.getBoundingClientRect();
       const mouseX = clientX - rect.left;
@@ -472,41 +510,52 @@
     updateTransform();
   }
 
+  function setupActivePanZoom(svgEl, viewportEl) {
+    if (activePanZoomController) {
+      activePanZoomController.destroy();
+      activePanZoomController = null;
+    }
+
+    if (typeof PanZoom !== 'undefined' && PanZoom.initPanZoom) {
+      activePanZoomController = PanZoom.initPanZoom(svgEl, viewportEl, {
+        initialState: viewState,
+        onTransform: (newState) => {
+          Object.assign(viewState, newState);
+        }
+      });
+    }
+  }
+
+  function setupActiveAnnotations(svgEl, viewportEl) {
+    if (activeAnnotationsController) {
+      activeAnnotationsController.destroy();
+      activeAnnotationsController = null;
+    }
+
+    if (typeof Annotations !== 'undefined' && Annotations.initAnnotations) {
+      activeAnnotationsController = Annotations.initAnnotations(svgEl, viewportEl, {
+        initialHighlights: Array.from(persistedHighlights),
+        hasMovedDuringDrag: () => {
+          return activePanZoomController && activePanZoomController.hasMovedDuringDrag && activePanZoomController.hasMovedDuringDrag();
+        },
+        onHighlightChange: (activeList) => {
+          persistedHighlights.clear();
+          activeList.forEach(id => persistedHighlights.add(id));
+        }
+      });
+    }
+  }
+
   function setupPanAndZoom() {
-    const container = document.getElementById('diagram-stage') || svg;
-    if (!container) return;
+    const stage = document.getElementById('diagram-stage');
+    const canvas = (stage && stage.querySelector('svg')) || document.getElementById('sage-canvas');
+    const vp = (canvas && canvas.querySelector('#viewport')) || document.getElementById('viewport');
+    if (canvas && vp) {
+      setupActivePanZoom(canvas, vp);
+      setupActiveAnnotations(canvas, vp);
+    }
 
-    let isPanning = false;
-    let startX = 0;
-    let startY = 0;
-
-    container.addEventListener('mousedown', e => {
-      // Only pan if clicking canvas background (not on an interactive node)
-      if (e.target.closest('.node')) return;
-      isPanning = true;
-      startX = e.clientX - viewState.x;
-      startY = e.clientY - viewState.y;
-    });
-
-    window.addEventListener('mousemove', e => {
-      if (!isPanning) return;
-      viewState.x = e.clientX - startX;
-      viewState.y = e.clientY - startY;
-      updateTransform();
-    });
-
-    window.addEventListener('mouseup', () => {
-      isPanning = false;
-    });
-
-    // Mouse wheel zoom
-    container.addEventListener('wheel', e => {
-      e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-      zoom(factor, e.clientX, e.clientY);
-    }, { passive: false });
-
-    // Header buttons
+    // Bind static toolbar button listeners as fallback
     const btnZoomIn = document.getElementById('btn-zoom-in');
     const btnZoomOut = document.getElementById('btn-zoom-out');
     const btnResetView = document.getElementById('btn-reset-view');
@@ -583,8 +632,15 @@
   }
 
   function exportSvg() {
-    const canvas = document.getElementById('sage-canvas');
+    const stage = document.getElementById('diagram-stage');
+    const canvas = (stage && stage.querySelector('svg')) || document.getElementById('sage-canvas');
     if (!canvas) return;
+
+    if (typeof SvgExporter !== 'undefined' && SvgExporter.exportDiagramAsSvg) {
+      SvgExporter.exportDiagramAsSvg(canvas);
+      return;
+    }
+
     const serializer = new XMLSerializer();
     const source = serializer.serializeToString(canvas);
     const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
@@ -662,13 +718,22 @@
       const svgEl = stage.querySelector('svg');
       if (svgEl) {
         svgEl.id = 'sage-canvas';
-        svgEl.classList.add('w-full', 'h-full');
+        svgEl.classList.add('w-full', 'h-full', 'cursor-grab');
+
+        // Wrap graph content inside dedicated viewport group for unified pan/zoom
+        const viewportEl = wrapInViewport(svgEl);
 
         // Post-processing sketch engine: replace standard geometric shapes with hand-drawn sketchy twins
         // TWEAK HERE: Pass custom parameter overrides to sketchify(svgEl, { roughness, bowing, hachureGap, fillWeight })
         if (typeof sketchify === 'function') {
           sketchify(svgEl);
         }
+
+        // Initialize pan and zoom controls
+        setupActivePanZoom(svgEl, viewportEl);
+
+        // Initialize click-to-highlight rough annotations
+        setupActiveAnnotations(svgEl, viewportEl);
       }
     } catch (err) {
       console.error('Mermaid rendering failed:', err);

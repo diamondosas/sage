@@ -69,6 +69,10 @@ api -> auth "validates token"
 	}
 }
 
+// TestServer_APIGraph_MermaidContent verifies that raw Mermaid markup within markdown
+// code blocks is cleanly parsed and served via the /api/graph endpoint.
+// TWEAK HERE: Modify the Mermaid flowchart snippet below to test alternative diagram
+// structures, custom subgraphs, or different directional flows (e.g., flowchart TD).
 func TestServer_APIGraph_MermaidContent(t *testing.T) {
 	content := "# Architecture\n\n```mermaid\nflowchart LR\n    api[API Gateway] --> auth[Auth Service]\n```"
 	filePath := setupTestDiagram(t, content)
@@ -130,6 +134,9 @@ func TestServer_StaticAssets(t *testing.T) {
 		"/static/js/libs/dagre.min.js",
 		"/static/js/libs/mermaid.min.js",
 		"/static/js/sketchify.js",
+		"/static/js/panzoom.js",
+		"/static/js/annotations.js",
+		"/static/js/export.js",
 		"/static/fonts/PatrickHand-Regular.ttf",
 		"/static/js/app.js",
 	}

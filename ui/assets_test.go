@@ -27,6 +27,9 @@ func TestStaticAssetsServed(t *testing.T) {
 		{"/js/libs/dagre.min.js", "javascript"},
 		{"/js/libs/mermaid.min.js", "javascript"},
 		{"/js/sketchify.js", "javascript"},
+		{"/js/panzoom.js", "javascript"},
+		{"/js/annotations.js", "javascript"},
+		{"/js/export.js", "javascript"},
 		{"/fonts/PatrickHand-Regular.ttf", "font"},
 	}
 
@@ -105,6 +108,9 @@ func TestBaseTemplateRendering(t *testing.T) {
 		`Export SVG`,
 		`/static/js/libs/mermaid.min.js`,
 		`/static/js/sketchify.js`,
+		`/static/js/panzoom.js`,
+		`/static/js/annotations.js`,
+		`/static/js/export.js`,
 		`Patrick Hand`,
 		`/static/fonts/PatrickHand-Regular.ttf`,
 		`bg-slate-900`,

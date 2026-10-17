@@ -6,6 +6,7 @@
     "sage-install": "./assets/install.js"
   },
   "scripts": {
+    "test": "node --test ui/js/*.test.js",
     "postinstall": "node ./assets/install.js"
   },
   "keywords": [
