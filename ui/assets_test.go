@@ -18,31 +18,42 @@ func TestStaticAssetsServed(t *testing.T) {
 	defer server.Close()
 
 	// To test additional static assets, add their paths to this slice:
-	assetPaths := []string{
-		"/css/tailwind.min.css",
-		"/js/libs/rough.js",
-		"/js/libs/dagre.min.js",
+	assetPaths := []struct {
+		path            string
+		expectedTypeSub string
+	}{
+		{"/css/tailwind.min.css", "text/css"},
+		{"/js/libs/rough.js", "javascript"},
+		{"/js/libs/dagre.min.js", "javascript"},
+		{"/js/libs/mermaid.min.js", "javascript"},
+		{"/js/sketchify.js", "javascript"},
+		{"/fonts/PatrickHand-Regular.ttf", "font"},
 	}
 
-	for _, path := range assetPaths {
-		t.Run(path, func(t *testing.T) {
-			resp, err := http.Get(server.URL + path)
+	for _, asset := range assetPaths {
+		t.Run(asset.path, func(t *testing.T) {
+			resp, err := http.Get(server.URL + asset.path)
 			if err != nil {
-				t.Fatalf("failed to fetch %s: %v", path, err)
+				t.Fatalf("failed to fetch %s: %v", asset.path, err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				t.Errorf("expected 200 OK for %s, got %d", path, resp.StatusCode)
+				t.Errorf("expected 200 OK for %s, got %d", asset.path, resp.StatusCode)
+			}
+
+			contentType := resp.Header.Get("Content-Type")
+			if !strings.Contains(strings.ToLower(contentType), asset.expectedTypeSub) {
+				t.Errorf("expected Content-Type containing %q for %s, got %q", asset.expectedTypeSub, asset.path, contentType)
 			}
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				t.Fatalf("failed to read body of %s: %v", path, err)
+				t.Fatalf("failed to read body of %s: %v", asset.path, err)
 			}
 
 			if len(body) == 0 {
-				t.Errorf("expected non-empty content for %s", path)
+				t.Errorf("expected non-empty content for %s", asset.path)
 			}
 		})
 	}
@@ -92,11 +103,32 @@ func TestBaseTemplateRendering(t *testing.T) {
 		`Zoom Out`,
 		`Reset`,
 		`Export SVG`,
+		`/static/js/libs/mermaid.min.js`,
+		`/static/js/sketchify.js`,
+		`Patrick Hand`,
+		`/static/fonts/PatrickHand-Regular.ttf`,
+		`bg-slate-900`,
 	}
 
 	for _, sub := range requiredSubstrings {
 		if !strings.Contains(rendered, sub) {
 			t.Errorf("rendered template missing expected substring: %q", sub)
+		}
+	}
+
+	// Verify that the template makes zero external network requests (100% offline).
+	disallowedSubstrings := []string{
+		"fonts.googleapis.com",
+		"fonts.gstatic.com",
+		"cdn.jsdelivr.net",
+		"cdnjs.cloudflare.com",
+		"http://",
+		"https://",
+	}
+
+	for _, bad := range disallowedSubstrings {
+		if strings.Contains(rendered, bad) {
+			t.Errorf("rendered template contains external network reference: %q", bad)
 		}
 	}
 }

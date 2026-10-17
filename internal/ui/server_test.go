@@ -69,6 +69,31 @@ api -> auth "validates token"
 	}
 }
 
+func TestServer_APIGraph_MermaidContent(t *testing.T) {
+	content := "# Architecture\n\n```mermaid\nflowchart LR\n    api[API Gateway] --> auth[Auth Service]\n```"
+	filePath := setupTestDiagram(t, content)
+	server := internalui.NewServer(internalui.Config{
+		FilePath: filePath,
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var graph parser.Graph
+	if err := json.NewDecoder(rec.Body).Decode(&graph); err != nil {
+		t.Fatalf("failed to decode json response: %v", err)
+	}
+
+	if !strings.Contains(graph.Mermaid, "flowchart LR") || !strings.Contains(graph.Mermaid, "api[API Gateway]") {
+		t.Fatalf("expected graph.Mermaid to contain flowchart markup, got %q", graph.Mermaid)
+	}
+}
+
 func TestServer_Index(t *testing.T) {
 	content := `rect core "Core Service" [yellow]`
 	filePath := setupTestDiagram(t, content)
@@ -103,6 +128,9 @@ func TestServer_StaticAssets(t *testing.T) {
 		"/static/css/tailwind.min.css",
 		"/static/js/libs/rough.js",
 		"/static/js/libs/dagre.min.js",
+		"/static/js/libs/mermaid.min.js",
+		"/static/js/sketchify.js",
+		"/static/fonts/PatrickHand-Regular.ttf",
 		"/static/js/app.js",
 	}
 

@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -59,6 +60,32 @@ rect alsoOutside "Should Not Be Parsed"
 	// Verify non-diagram text outside the block was not recorded as warnings
 	if len(g.Warnings) > 0 {
 		t.Fatalf("expected no warnings for markdown outside fence, got: %v", g.Warnings)
+	}
+}
+
+// TestParseMermaidBlock tests extracting Mermaid flowchart blocks.
+func TestParseMermaidBlock(t *testing.T) {
+	input := `# Architecture Overview
+Here is the system:
+
+` + "```mermaid" + `
+flowchart LR
+    frontend[Web App] --> api[API Gateway]
+    api --> db[(PostgreSQL)]
+` + "```" + `
+`
+	g := Parse(input)
+	if g.Mermaid == "" {
+		t.Fatalf("expected Mermaid content to be extracted, got empty")
+	}
+	if !strings.Contains(g.Mermaid, "flowchart LR") {
+		t.Errorf("expected Mermaid content to contain 'flowchart LR', got: %s", g.Mermaid)
+	}
+	if !strings.Contains(g.Mermaid, "frontend[Web App] --> api[API Gateway]") {
+		t.Errorf("expected Mermaid content to contain node connection, got: %s", g.Mermaid)
+	}
+	if len(g.Warnings) != 0 {
+		t.Errorf("expected 0 warnings, got: %v", g.Warnings)
 	}
 }
 
@@ -213,8 +240,166 @@ func TestParseInlineFenceMention(t *testing.T) {
 	}
 }
 
+// TestTranspileLegacyDSLToMermaid_ShapesAndEdges verifies that legacy DSL declarations
+// (rect, circle, diamond, triangle, cylinder, and connections) are converted into Mermaid markup.
+func TestTranspileLegacyDSLToMermaid_ShapesAndEdges(t *testing.T) {
+	input := `
+rect svc "User Service"
+circle client "Web Client"
+diamond gate "API Gate"
+triangle worker "Job Worker"
+cylinder db "Main DB"
 
+client -> gate "requests"
+gate -> svc
+svc <-> db "syncs"
+`
+	g := Parse(input)
+	if g.Mermaid == "" {
+		t.Fatalf("expected g.Mermaid to be populated from legacy DSL transpilation, got empty")
+	}
 
+	expectedSnippets := []string{
+		"flowchart LR",
+		`svc["User Service"]`,
+		`client(("Web Client"))`,
+		`gate{"API Gate"}`,
+		`worker>"Job Worker"]`,
+		`db[("Main DB")]`,
+		`client -->|"requests"| gate`,
+		`gate --> svc`,
+		`svc <-->|"syncs"| db`,
+	}
 
+	for _, snippet := range expectedSnippets {
+		if !strings.Contains(g.Mermaid, snippet) {
+			t.Errorf("expected transpiled Mermaid to contain %q, but got:\n%s", snippet, g.Mermaid)
+		}
+	}
+}
 
+// TestTranspileLegacyDSLToMermaid_Subgraphs verifies that // group: headers are transpiled
+// into Mermaid subgraphs containing their respective member nodes.
+func TestTranspileLegacyDSLToMermaid_Subgraphs(t *testing.T) {
+	input := `
+// group: Frontend Layer
+// path: ui/web
+circle browser "Web Browser"
 
+// group: Backend Services
+// path: internal/api
+rect gateway "API Gateway"
+rect auth "Auth Service"
+
+// group:
+cylinder shared_db "Database"
+
+browser -> gateway "HTTPS"
+gateway -> auth
+auth -> shared_db
+`
+	g := Parse(input)
+	if g.Mermaid == "" {
+		t.Fatalf("expected g.Mermaid to be populated, got empty")
+	}
+
+	expectedSnippets := []string{
+		"flowchart LR",
+		"subgraph",
+		`Frontend Layer`,
+		`browser(("Web Browser"))`,
+		`Backend Services`,
+		`gateway["API Gateway"]`,
+		`auth["Auth Service"]`,
+		`shared_db[("Database")]`,
+		`browser -->|"HTTPS"| gateway`,
+		`gateway --> auth`,
+		`auth --> shared_db`,
+	}
+
+	for _, snippet := range expectedSnippets {
+		if !strings.Contains(g.Mermaid, snippet) {
+			t.Errorf("expected transpiled Mermaid to contain %q, but got:\n%s", snippet, g.Mermaid)
+		}
+	}
+}
+
+// TestTranspileLegacyDSLToMermaid_ColorsAndFallbacks verifies palette class tags, classDef emissions,
+// and synthesized fallback nodes for undeclared edge endpoints.
+func TestTranspileLegacyDSLToMermaid_ColorsAndFallbacks(t *testing.T) {
+	input := `
+rect api "API Gateway" [blue]
+circle client "Web Client" [green]
+api -> unknownService "routes to"
+`
+	g := Parse(input)
+	if g.Mermaid == "" {
+		t.Fatalf("expected g.Mermaid to be populated, got empty")
+	}
+
+	// Verify class tags on nodes
+	if !strings.Contains(g.Mermaid, `api["API Gateway"]:::blue`) {
+		t.Errorf("expected api node to have :::blue class tag, got:\n%s", g.Mermaid)
+	}
+	if !strings.Contains(g.Mermaid, `client(("Web Client")):::green`) {
+		t.Errorf("expected client node to have :::green class tag, got:\n%s", g.Mermaid)
+	}
+
+	// Verify classDef palette rules
+	if !strings.Contains(g.Mermaid, "classDef blue") || !strings.Contains(g.Mermaid, "classDef green") {
+		t.Errorf("expected Mermaid to contain classDef rules for blue and green, got:\n%s", g.Mermaid)
+	}
+
+	// Verify synthesized fallback node
+	if !strings.Contains(g.Mermaid, `unknownService["unknownService"]:::gray`) {
+		t.Errorf("expected synthesized fallback node in Mermaid, got:\n%s", g.Mermaid)
+	}
+	if len(g.Warnings) == 0 {
+		t.Errorf("expected warning for synthesized fallback node, got none")
+	}
+}
+
+// TestParse_ExistingRootSAGEMD verifies that existing SAGE.md files render cleanly.
+func TestParse_ExistingRootSAGEMD(t *testing.T) {
+	bytes, err := os.ReadFile("../../SAGE.md")
+	if err != nil {
+		t.Skip("root SAGE.md not found relative to test, skipping")
+	}
+
+	g := Parse(string(bytes))
+	if g.Mermaid == "" {
+		t.Fatalf("expected root SAGE.md to transpile to Mermaid, got empty")
+	}
+
+	if !strings.Contains(g.Mermaid, "flowchart LR") {
+		t.Errorf("expected SAGE.md transpiled output to contain 'flowchart LR'")
+	}
+	if !strings.Contains(g.Mermaid, "CLI Entrypoint") {
+		t.Errorf("expected SAGE.md transpiled output to contain 'CLI Entrypoint' subgraph")
+	}
+	if !strings.Contains(g.Mermaid, `user(("Terminal Developer")):::green`) {
+		t.Errorf("expected SAGE.md transpiled output to contain user node")
+	}
+}
+
+// TestValidateMermaid_ValidAndMalformed verifies zero warnings for clean Mermaid
+// and non-fatal warnings for malformed syntax or missing headers.
+func TestValidateMermaid_ValidAndMalformed(t *testing.T) {
+	validMermaid := "```mermaid\nflowchart LR\n    a[Alpha] --> b[(Beta)]\n```"
+	gValid := Parse(validMermaid)
+	if len(gValid.Warnings) != 0 {
+		t.Errorf("expected 0 warnings for valid Mermaid, got: %v", gValid.Warnings)
+	}
+
+	malformedHeader := "```mermaid\nsequenceDiagram\n    Alice->>Bob: Hello\n```"
+	gHeader := Parse(malformedHeader)
+	if len(gHeader.Warnings) == 0 {
+		t.Errorf("expected warning for non-flowchart Mermaid diagram")
+	}
+
+	unbalancedDelim := "```mermaid\nflowchart LR\n    a[Unclosed box --> b\n```"
+	gDelim := Parse(unbalancedDelim)
+	if len(gDelim.Warnings) == 0 {
+		t.Errorf("expected warning for unbalanced delimiter in Mermaid")
+	}
+}

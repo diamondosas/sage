@@ -458,8 +458,9 @@
     const newScale = Math.min(viewState.maxScale, Math.max(viewState.minScale, oldScale * factor));
     if (newScale === oldScale) return;
 
-    if (clientX !== undefined && clientY !== undefined && svg) {
-      const rect = svg.getBoundingClientRect();
+    const activeCanvas = document.getElementById('sage-canvas') || svg;
+    if (clientX !== undefined && clientY !== undefined && activeCanvas) {
+      const rect = activeCanvas.getBoundingClientRect();
       const mouseX = clientX - rect.left;
       const mouseY = clientY - rect.top;
 
@@ -472,14 +473,15 @@
   }
 
   function setupPanAndZoom() {
-    if (!svg) return;
+    const container = document.getElementById('diagram-stage') || svg;
+    if (!container) return;
 
     let isPanning = false;
     let startX = 0;
     let startY = 0;
 
-    svg.addEventListener('mousedown', e => {
-      // Only pan if clicking canvas background (not on a node)
+    container.addEventListener('mousedown', e => {
+      // Only pan if clicking canvas background (not on an interactive node)
       if (e.target.closest('.node')) return;
       isPanning = true;
       startX = e.clientX - viewState.x;
@@ -498,7 +500,7 @@
     });
 
     // Mouse wheel zoom
-    svg.addEventListener('wheel', e => {
+    container.addEventListener('wheel', e => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 0.9;
       zoom(factor, e.clientX, e.clientY);
@@ -581,9 +583,10 @@
   }
 
   function exportSvg() {
-    if (!svg) return;
+    const canvas = document.getElementById('sage-canvas');
+    if (!canvas) return;
     const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
+    const source = serializer.serializeToString(canvas);
     const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -593,6 +596,99 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  // =========================================================================
+  // MERMAID RENDERING PIPELINE
+  // =========================================================================
+
+  // Calibrated dark slate palette variables for Mermaid diagram theme.
+  // Variables can be tweaked here to customize stroke, text, background, and node accents:
+  // - background: Canvas stage background color (#0f172a / bg-slate-900)
+  // - primaryColor: Default node surface fill (#1e293b / bg-slate-800)
+  // - primaryBorderColor: High-contrast node boundary (#60a5fa / light blue)
+  // - primaryTextColor: High-contrast legible text (#f8fafc / slate-50)
+  // - lineColor: Dependency arrow stroke (#94a3b8 / slate-400)
+  const MERMAID_THEME_VARIABLES = {
+    fontFamily: "'Patrick Hand', cursive, sans-serif",
+    fontSize: '18px',
+    background: '#0f172a',
+    primaryColor: '#1e293b',
+    primaryTextColor: '#f8fafc',
+    primaryBorderColor: '#60a5fa',
+    lineColor: '#94a3b8',
+    secondaryColor: '#334155',
+    tertiaryColor: '#1e293b',
+    clusterBkg: '#1e293b',
+    clusterBorder: '#475569',
+    edgeLabelBackground: '#1e293b',
+    nodeBorder: '#60a5fa',
+    mainBkg: '#1e293b',
+    labelTextColor: '#f8fafc'
+  };
+
+  let mermaidRenderCounter = 0;
+
+  async function renderMermaidDiagram(mermaidSource) {
+    if (typeof mermaid === 'undefined') {
+      console.error('Mermaid library not found in embedded dependencies.');
+      return;
+    }
+
+    // Wait for Patrick Hand font to load if supported by browser
+    if (document.fonts && document.fonts.load) {
+      try {
+        await document.fonts.load('18px "Patrick Hand"');
+      } catch (e) {
+        // Fallback gracefully if font load check fails
+      }
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      securityLevel: 'loose',
+      fontFamily: "'Patrick Hand', cursive, sans-serif",
+      themeVariables: MERMAID_THEME_VARIABLES
+    });
+
+    const stage = document.getElementById('diagram-stage');
+    if (!stage) return;
+
+    const renderId = 'mermaid-svg-' + (++mermaidRenderCounter);
+    try {
+      const { svg: svgOutput } = await mermaid.render(renderId, mermaidSource);
+      stage.innerHTML = svgOutput;
+      const svgEl = stage.querySelector('svg');
+      if (svgEl) {
+        svgEl.id = 'sage-canvas';
+        svgEl.classList.add('w-full', 'h-full');
+
+        // Post-processing sketch engine: replace standard geometric shapes with hand-drawn sketchy twins
+        // TWEAK HERE: Pass custom parameter overrides to sketchify(svgEl, { roughness, bowing, hachureGap, fillWeight })
+        if (typeof sketchify === 'function') {
+          sketchify(svgEl);
+        }
+      }
+    } catch (err) {
+      console.error('Mermaid rendering failed:', err);
+      // Mermaid injects an error element prefixed with 'd' on parse failure; remove it to keep UI clean
+      const orphanedErrorEl = document.getElementById('d' + renderId);
+      if (orphanedErrorEl) orphanedErrorEl.remove();
+      updateWarnings(['Mermaid render error: ' + (err.message || err)]);
+    }
+  }
+
+  // Common dispatcher for parsed graph AST data and raw Mermaid diagram content
+  function applyGraphData(data) {
+    currentGraph = data;
+    updateWarnings(data.warnings);
+    if (data.mermaid) {
+      renderMermaidDiagram(data.mermaid);
+    } else {
+      computeLayout(data);
+      renderGraph();
+    }
   }
 
   // =========================================================================
@@ -606,10 +702,7 @@
         return resp.json();
       })
       .then(data => {
-        currentGraph = data;
-        updateWarnings(data.warnings);
-        computeLayout(data);
-        renderGraph();
+        applyGraphData(data);
       })
       .catch(err => {
         console.error('Failed to fetch updated graph:', err);
@@ -662,10 +755,7 @@
     }
 
     if (initialData && typeof initialData === 'object') {
-      currentGraph = initialData;
-      updateWarnings(initialData.warnings);
-      computeLayout(initialData);
-      renderGraph();
+      applyGraphData(initialData);
     } else {
       // Fallback: fetch from /api/graph if initial data wasn't inlined
       fetchGraphAndRender();

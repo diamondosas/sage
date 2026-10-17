@@ -4,8 +4,22 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
+
+// colorPaletteClasses maps SAGE color names to Mermaid classDef styling properties.
+// These match the calibrated dark slate palette variables in ui/js/app.js.
+var colorPaletteClasses = map[string]string{
+	"blue":   "fill:#1e3a8a,stroke:#60a5fa,color:#dbeafe",
+	"green":  "fill:#14532d,stroke:#4ade80,color:#dcfce7",
+	"red":    "fill:#7f1d1d,stroke:#f87171,color:#fee2e2",
+	"yellow": "fill:#713f12,stroke:#facc15,color:#fef9c3",
+	"purple": "fill:#581c87,stroke:#c084fc,color:#f3e8ff",
+	"orange": "fill:#7c2d12,stroke:#fb923c,color:#ffedd5",
+	"gray":   "fill:#334155,stroke:#94a3b8,color:#f1f5f9",
+}
+
 
 // Configuration variables and default visual attributes.
 // Change these default variables if alternate behavior or styling is desired:
@@ -46,11 +60,11 @@ func normalizeShape(raw string) (ShapeType, bool) {
 	}
 }
 
-// extractContent extracts text within ```sage ... ``` markdown code blocks if present.
-// If no code fence is found or the fence contains no statements, it returns the raw input unmodified.
-func extractContent(input string) string {
-	if !strings.Contains(input, "```sage") {
-		return input
+// extractFenceBlock extracts content inside a specific markdown code fence (e.g., ```sage or ```mermaid).
+func extractFenceBlock(input, tag string) (string, bool) {
+	fence := "```" + tag
+	if !strings.Contains(input, fence) {
+		return "", false
 	}
 
 	var sb strings.Builder
@@ -60,7 +74,7 @@ func extractContent(input string) string {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```sage") {
+		if strings.HasPrefix(trimmed, fence) {
 			insideFence = true
 			foundFence = true
 			continue
@@ -68,7 +82,7 @@ func extractContent(input string) string {
 		if insideFence && strings.HasPrefix(trimmed, "```") {
 			insideFence = false
 			sb.WriteString("\n")
-			continue
+			break
 		}
 		if insideFence {
 			sb.WriteString(line)
@@ -77,10 +91,111 @@ func extractContent(input string) string {
 	}
 
 	if !foundFence || strings.TrimSpace(sb.String()) == "" {
-		return input
+		return "", false
+	}
+	return sb.String(), true
+}
+
+// extractContent extracts text within ```sage ... ``` markdown code blocks if present.
+// If no code fence is found or the fence contains no statements, it returns the raw input unmodified.
+func extractContent(input string) string {
+	if content, ok := extractFenceBlock(input, "sage"); ok {
+		return content
+	}
+	return input
+}
+
+// extractMermaidBlock extracts Mermaid flowchart definitions from ```mermaid ... ``` code blocks
+// or detects raw Mermaid declarations (e.g., lines starting with flowchart or graph).
+func extractMermaidBlock(input string) string {
+	if content, ok := extractFenceBlock(input, "mermaid"); ok {
+		return strings.TrimSpace(content)
 	}
 
-	return sb.String()
+	trimmed := strings.TrimSpace(input)
+	if strings.HasPrefix(trimmed, "flowchart ") || strings.HasPrefix(trimmed, "graph ") ||
+		strings.HasPrefix(trimmed, "flowchart\n") || strings.HasPrefix(trimmed, "graph\n") {
+		return trimmed
+	}
+
+	return ""
+}
+
+// validateMermaid checks Mermaid markup for valid flowchart headers and balanced delimiters,
+// collecting non-fatal syntax errors into a warnings slice.
+func validateMermaid(source string) []string {
+	var warnings []string
+	lines := strings.Split(source, "\n")
+	var headerLine string
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "" || strings.HasPrefix(trimmed, "%%") {
+			continue
+		}
+		headerLine = trimmed
+		break
+	}
+
+	if headerLine == "" || (!strings.HasPrefix(headerLine, "flowchart") && !strings.HasPrefix(headerLine, "graph")) {
+		warnings = append(warnings, fmt.Sprintf("unsupported or missing flowchart header: expected 'flowchart [direction]' or 'graph [direction]', got %q", headerLine))
+	}
+
+	// Delimiter and quote balancing checks
+	openBrackets := 0
+	openParens := 0
+	openBraces := 0
+
+	for lineIdx, rawLine := range lines {
+		trimmed := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(trimmed, "%%") {
+			continue
+		}
+
+		quoteCount := 0
+		escaped := false
+		for _, ch := range trimmed {
+			if ch == '\\' {
+				escaped = !escaped
+				continue
+			}
+			if ch == '"' && !escaped {
+				quoteCount++
+			}
+			escaped = false
+		}
+		if quoteCount%2 != 0 {
+			warnings = append(warnings, fmt.Sprintf("unclosed quote on line %d: %s", lineIdx+1, trimmed))
+		}
+
+		for _, ch := range trimmed {
+			switch ch {
+			case '[':
+				openBrackets++
+			case ']':
+				openBrackets--
+			case '(':
+				openParens++
+			case ')':
+				openParens--
+			case '{':
+				openBraces++
+			case '}':
+				openBraces--
+			}
+		}
+	}
+
+	if openBrackets != 0 {
+		warnings = append(warnings, fmt.Sprintf("unbalanced bracket delimiter '[': difference count %d", openBrackets))
+	}
+	if openParens != 0 {
+		warnings = append(warnings, fmt.Sprintf("unbalanced parenthesis delimiter '(': difference count %d", openParens))
+	}
+	if openBraces != 0 {
+		warnings = append(warnings, fmt.Sprintf("unbalanced brace delimiter '{': difference count %d", openBraces))
+	}
+
+	return warnings
 }
 
 // Parse extracts the architectural Graph from raw or markdown-fenced SAGE DSL content.
@@ -90,6 +205,13 @@ func Parse(input string) *Graph {
 		Nodes:    []Node{},
 		Edges:    []Edge{},
 		Warnings: []string{},
+	}
+
+	// If the document contains Mermaid markup, validate and return it.
+	if mermaidSrc := extractMermaidBlock(input); mermaidSrc != "" {
+		g.Mermaid = mermaidSrc
+		g.Warnings = validateMermaid(mermaidSrc)
+		return g
 	}
 
 	content := extractContent(input)
@@ -201,7 +323,137 @@ func Parse(input string) *Graph {
 		ensureNode(edge.To)
 	}
 
+	// Transpile legacy DSL AST into valid Mermaid flowchart markup
+	if len(g.Nodes) > 0 || len(g.Edges) > 0 {
+		g.Mermaid = transpileToMermaid(g)
+	}
+
 	return g
+}
+
+// formatMermaidNode renders a Node into its corresponding Mermaid flowchart shape declaration.
+func formatMermaidNode(node Node) string {
+	cleanLabel := node.Label
+	if cleanLabel == "" {
+		cleanLabel = node.ID
+	}
+	var shapeFmt string
+	switch node.Shape {
+	case ShapeCircle:
+		shapeFmt = fmt.Sprintf("%s((\"%s\"))", node.ID, cleanLabel)
+	case ShapeDiamond:
+		shapeFmt = fmt.Sprintf("%s{\"%s\"}", node.ID, cleanLabel)
+	case ShapeTriangle:
+		shapeFmt = fmt.Sprintf("%s>\"%s\"]", node.ID, cleanLabel)
+	case ShapeCylinder:
+		shapeFmt = fmt.Sprintf("%s[(\"%s\")]", node.ID, cleanLabel)
+	case ShapeRect:
+		fallthrough
+	default:
+		shapeFmt = fmt.Sprintf("%s[\"%s\"]", node.ID, cleanLabel)
+	}
+
+	if node.Color != "" {
+		shapeFmt += fmt.Sprintf(":::%s", strings.ToLower(node.Color))
+	}
+	return shapeFmt
+}
+
+// formatMermaidEdge renders an Edge into Mermaid connection syntax.
+func formatMermaidEdge(edge Edge) string {
+	arrow := "-->"
+	if edge.Bidirectional {
+		arrow = "<-->"
+	}
+	if edge.Label != "" {
+		return fmt.Sprintf("%s %s|\"%s\"| %s", edge.From, arrow, edge.Label, edge.To)
+	}
+	return fmt.Sprintf("%s %s %s", edge.From, arrow, edge.To)
+}
+
+// sanitizeSubgraphID produces a clean identifier for a Mermaid subgraph.
+func sanitizeSubgraphID(name string, index int) string {
+	var sb strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune('_')
+		}
+	}
+	s := strings.Trim(sb.String(), "_")
+	if s == "" {
+		return fmt.Sprintf("subgraph_%d", index)
+	}
+	return fmt.Sprintf("sg_%s", s)
+}
+
+// transpileToMermaid converts the parsed Graph AST into standard Mermaid flowchart markup.
+func transpileToMermaid(g *Graph) string {
+	if len(g.Nodes) == 0 && len(g.Edges) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("flowchart LR\n")
+
+	// Group nodes by architectural domain clusters
+	var groupOrder []string
+	groupedNodes := make(map[string][]Node)
+	var ungroupedNodes []Node
+	usedColors := make(map[string]bool)
+
+	for _, node := range g.Nodes {
+		if node.Color != "" {
+			usedColors[strings.ToLower(node.Color)] = true
+		}
+		if node.Group == "" {
+			ungroupedNodes = append(ungroupedNodes, node)
+		} else {
+			if _, exists := groupedNodes[node.Group]; !exists {
+				groupOrder = append(groupOrder, node.Group)
+			}
+			groupedNodes[node.Group] = append(groupedNodes[node.Group], node)
+		}
+	}
+
+	for idx, groupName := range groupOrder {
+		sgID := sanitizeSubgraphID(groupName, idx)
+		sb.WriteString(fmt.Sprintf("    subgraph %s [\"%s\"]\n", sgID, groupName))
+		for _, node := range groupedNodes[groupName] {
+			sb.WriteString("        ")
+			sb.WriteString(formatMermaidNode(node))
+			sb.WriteString("\n")
+		}
+		sb.WriteString("    end\n")
+	}
+
+	for _, node := range ungroupedNodes {
+		sb.WriteString("    ")
+		sb.WriteString(formatMermaidNode(node))
+		sb.WriteString("\n")
+	}
+
+	for _, edge := range g.Edges {
+		sb.WriteString("    ")
+		sb.WriteString(formatMermaidEdge(edge))
+		sb.WriteString("\n")
+	}
+
+	// Emit classDef definitions for colors used in diagram
+	var sortedColors []string
+	for c := range usedColors {
+		sortedColors = append(sortedColors, c)
+	}
+	sort.Strings(sortedColors)
+
+	for _, colorName := range sortedColors {
+		if style, ok := colorPaletteClasses[colorName]; ok {
+			sb.WriteString(fmt.Sprintf("    classDef %s %s\n", colorName, style))
+		}
+	}
+
+	return strings.TrimSpace(sb.String())
 }
 
 // ParseFile reads a SAGE DSL file from disk and parses its content into a Graph.
@@ -212,3 +464,4 @@ func ParseFile(filePath string) (*Graph, error) {
 	}
 	return Parse(string(bytes)), nil
 }
+

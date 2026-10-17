@@ -31,9 +31,10 @@ type Edge struct {
 	Bidirectional bool   `json:"bidirectional,omitempty"`
 }
 
-// Graph contains all extracted nodes, edges, and non-fatal syntax warnings.
+// Graph contains all extracted nodes, edges, non-fatal syntax warnings, and optional Mermaid syntax.
 type Graph struct {
 	Nodes    []Node   `json:"nodes"`
 	Edges    []Edge   `json:"edges"`
 	Warnings []string `json:"warnings,omitempty"`
+	Mermaid  string   `json:"mermaid,omitempty"`
 }

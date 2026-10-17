@@ -10,8 +10,21 @@
   <link rel="stylesheet" href="/static/css/tailwind.min.css">
 
   <style>
+    /* Local handwriting font definition for 100% offline diagram rendering */
+    @font-face {
+      font-family: 'Patrick Hand';
+      font-style: normal;
+      font-weight: 400;
+      src: url('/static/fonts/PatrickHand-Regular.ttf') format('truetype');
+      font-display: swap;
+    }
+
     /* CUSTOMIZATION: Change font family to match your preferred typography */
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    /* Apply Patrick Hand handwriting font to Mermaid diagram elements */
+    .mermaid text, .mermaid tspan, #sage-canvas text, #diagram-stage text {
+      font-family: 'Patrick Hand', cursive, sans-serif;
+    }
     /* Disable default user select on interactive canvas during pan/drag */
     #sage-canvas { user-select: none; -webkit-user-select: none; }
   </style>
@@ -77,23 +90,25 @@
   <!-- Main Visualizer SVG Canvas Container:
        CUSTOMIZATION: Change canvas background color via bg-slate-900 -->
   <main class="flex-1 relative overflow-hidden bg-slate-900">
-    <svg id="sage-canvas" class="w-full h-full cursor-grab active:cursor-grabbing">
-      <defs>
-        <!-- Arrowhead markers for directed edges rendered by app.js -->
-        <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 8 5 L 0 9 z" fill="#94a3b8" />
-        </marker>
-        <marker id="arrowhead-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 8 1 L 0 5 L 8 9 z" fill="#94a3b8" />
-        </marker>
-      </defs>
-      <!-- Viewport group for pan and zoom transformations -->
-      <g id="viewport">
-        <!-- Dynamic graph nodes and edges will be inserted dynamically here -->
-        <g id="edges-layer"></g>
-        <g id="nodes-layer"></g>
-      </g>
-    </svg>
+    <div id="diagram-stage" class="w-full h-full flex items-center justify-center">
+      <svg id="sage-canvas" class="w-full h-full cursor-grab active:cursor-grabbing">
+        <defs>
+          <!-- Arrowhead markers for directed edges rendered by app.js -->
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#94a3b8" />
+          </marker>
+          <marker id="arrowhead-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 8 1 L 0 5 L 8 9 z" fill="#94a3b8" />
+          </marker>
+        </defs>
+        <!-- Viewport group for pan and zoom transformations -->
+        <g id="viewport">
+          <!-- Dynamic graph nodes and edges will be inserted dynamically here -->
+          <g id="edges-layer"></g>
+          <g id="nodes-layer"></g>
+        </g>
+      </svg>
+    </div>
   </main>
 
   <!-- Initial Graph Data from Go template:
@@ -103,8 +118,15 @@
   </script>
 
   <!-- Standalone vendored dependencies (no NPM required) -->
+  <script src="/static/js/libs/mermaid.min.js"></script>
   <script src="/static/js/libs/rough.js"></script>
   <script src="/static/js/libs/dagre.min.js"></script>
+
+  <!-- Modular Visualizer Subsystems (zero-build, 100% offline) -->
+  <script src="/static/js/sketchify.js"></script>
+  <script src="/static/js/panzoom.js"></script>
+  <script src="/static/js/annotations.js"></script>
+  <script src="/static/js/export.js"></script>
 
   <!-- Client Application Script:
        CUSTOMIZATION: Modify ui/js/app.js to change layout spacing, colors, or physics -->

@@ -9,7 +9,7 @@ import (
 // Assets embeds all static files (CSS, JS) and Go templates (*.tpl).
 // Modify this embed pattern if additional asset folders are introduced.
 //
-//go:embed html/* css/* js/*
+//go:embed html/* css/* js/* fonts/*
 var Assets embed.FS
 
 // StaticFileServer returns an http.Handler that serves embedded static assets (css, js, etc.).
