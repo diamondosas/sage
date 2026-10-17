@@ -106,16 +106,31 @@ func extractContent(input string) string {
 }
 
 // extractMermaidBlock extracts Mermaid flowchart definitions from ```mermaid ... ``` code blocks
-// or detects raw Mermaid declarations (e.g., lines starting with flowchart or graph).
+// or detects raw Mermaid declarations (e.g., lines starting with flowchart or graph, optionally preceded by frontmatter or comments).
 func extractMermaidBlock(input string) string {
 	if content, ok := extractFenceBlock(input, "mermaid"); ok {
 		return strings.TrimSpace(content)
 	}
 
 	trimmed := strings.TrimSpace(input)
-	if strings.HasPrefix(trimmed, "flowchart ") || strings.HasPrefix(trimmed, "graph ") ||
-		strings.HasPrefix(trimmed, "flowchart\n") || strings.HasPrefix(trimmed, "graph\n") {
-		return trimmed
+	checkText := trimmed
+	if strings.HasPrefix(checkText, "---") {
+		parts := strings.SplitN(checkText[3:], "---", 2)
+		if len(parts) == 2 {
+			checkText = strings.TrimSpace(parts[1])
+		}
+	}
+
+	lines := strings.Split(checkText, "\n")
+	for _, line := range lines {
+		tl := strings.TrimSpace(line)
+		if tl == "" || strings.HasPrefix(tl, "%%") {
+			continue
+		}
+		if strings.HasPrefix(tl, "flowchart") || strings.HasPrefix(tl, "graph") {
+			return trimmed
+		}
+		break
 	}
 
 	return ""
@@ -127,9 +142,25 @@ func validateMermaid(source string) []string {
 	var warnings []string
 	lines := strings.Split(source, "\n")
 	var headerLine string
+	inFrontmatter := false
+	frontmatterDone := false
+
 	for _, l := range lines {
 		trimmed := strings.TrimSpace(l)
 		if trimmed == "" || strings.HasPrefix(trimmed, "%%") {
+			continue
+		}
+		if trimmed == "---" && !frontmatterDone {
+			if !inFrontmatter {
+				inFrontmatter = true
+				continue
+			} else {
+				inFrontmatter = false
+				frontmatterDone = true
+				continue
+			}
+		}
+		if inFrontmatter {
 			continue
 		}
 		headerLine = trimmed
@@ -147,27 +178,39 @@ func validateMermaid(source string) []string {
 
 	for lineIdx, rawLine := range lines {
 		trimmed := strings.TrimSpace(rawLine)
-		if strings.HasPrefix(trimmed, "%%") {
+		if strings.HasPrefix(trimmed, "%%") || trimmed == "---" {
 			continue
 		}
 
 		quoteCount := 0
+		inQuotes := false
 		escaped := false
-		for _, ch := range trimmed {
+
+		for i := 0; i < len(trimmed); i++ {
+			ch := trimmed[i]
 			if ch == '\\' {
 				escaped = !escaped
 				continue
 			}
 			if ch == '"' && !escaped {
+				inQuotes = !inQuotes
 				quoteCount++
+				escaped = false
+				continue
 			}
 			escaped = false
-		}
-		if quoteCount%2 != 0 {
-			warnings = append(warnings, fmt.Sprintf("unclosed quote on line %d: %s", lineIdx+1, trimmed))
-		}
 
-		for _, ch := range trimmed {
+			if inQuotes {
+				continue
+			}
+
+			// Check for asymmetric node shape opening: e.g., worker>"label"]
+			// Where an alphanumeric identifier precedes '>', it acts as opening bracket balanced by ']'
+			if ch == '>' && i > 0 && isNodeIdentChar(trimmed[i-1]) {
+				openBrackets++
+				continue
+			}
+
 			switch ch {
 			case '[':
 				openBrackets++
@@ -183,6 +226,10 @@ func validateMermaid(source string) []string {
 				openBraces--
 			}
 		}
+
+		if quoteCount%2 != 0 {
+			warnings = append(warnings, fmt.Sprintf("unclosed quote on line %d: %s", lineIdx+1, trimmed))
+		}
 	}
 
 	if openBrackets != 0 {
@@ -196,6 +243,10 @@ func validateMermaid(source string) []string {
 	}
 
 	return warnings
+}
+
+func isNodeIdentChar(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
 }
 
 // Parse extracts the architectural Graph from raw or markdown-fenced SAGE DSL content.
@@ -381,11 +432,11 @@ func sanitizeSubgraphID(name string, index int) string {
 			sb.WriteRune('_')
 		}
 	}
-	s := strings.Trim(sb.String(), "_")
-	if s == "" {
+	cleanBase := strings.Trim(sb.String(), "_")
+	if cleanBase == "" {
 		return fmt.Sprintf("subgraph_%d", index)
 	}
-	return fmt.Sprintf("sg_%s", s)
+	return fmt.Sprintf("sg_%s", cleanBase)
 }
 
 // transpileToMermaid converts the parsed Graph AST into standard Mermaid flowchart markup.

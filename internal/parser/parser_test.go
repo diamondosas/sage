@@ -391,6 +391,24 @@ func TestValidateMermaid_ValidAndMalformed(t *testing.T) {
 		t.Errorf("expected 0 warnings for valid Mermaid, got: %v", gValid.Warnings)
 	}
 
+	// Mermaid with frontmatter, comments, asymmetric shapes, and symbols inside quotes
+	frontmatterMermaid := `
+---
+title: System Architecture
+---
+%% Top level system map
+flowchart LR
+    worker>"Queue Worker"] --> db[("Primary [PostgreSQL] (v15)")]
+    api["API Gateway (REST / gRPC)"] --> worker
+`
+	gFM := Parse(frontmatterMermaid)
+	if len(gFM.Warnings) != 0 {
+		t.Errorf("expected 0 warnings for frontmatter/asymmetric Mermaid, got: %v", gFM.Warnings)
+	}
+	if gFM.Mermaid == "" {
+		t.Errorf("expected gFM.Mermaid to be populated")
+	}
+
 	malformedHeader := "```mermaid\nsequenceDiagram\n    Alice->>Bob: Hello\n```"
 	gHeader := Parse(malformedHeader)
 	if len(gHeader.Warnings) == 0 {
