@@ -90,31 +90,31 @@ function extractNodeId(el) {
  * @param {Object} inverseMatrix - Inverse CTM matrix or transform helper.
  */
 function computeNodeBounds(clientRect, inverseMatrix) {
-  let p1 = { x: clientRect.left, y: clientRect.top };
-  let p2 = { x: clientRect.right, y: clientRect.bottom };
+  let topLeft = { x: clientRect.left, y: clientRect.top };
+  let bottomRight = { x: clientRect.right, y: clientRect.bottom };
 
   if (inverseMatrix) {
     if (typeof inverseMatrix.transformPoint === 'function') {
-      p1 = inverseMatrix.transformPoint(p1);
-      p2 = inverseMatrix.transformPoint(p2);
+      topLeft = inverseMatrix.transformPoint(topLeft);
+      bottomRight = inverseMatrix.transformPoint(bottomRight);
     } else if (typeof DOMPoint !== 'undefined' && inverseMatrix.a !== undefined) {
-      p1 = new DOMPoint(clientRect.left, clientRect.top).matrixTransform(inverseMatrix);
-      p2 = new DOMPoint(clientRect.right, clientRect.bottom).matrixTransform(inverseMatrix);
+      topLeft = new DOMPoint(clientRect.left, clientRect.top).matrixTransform(inverseMatrix);
+      bottomRight = new DOMPoint(clientRect.right, clientRect.bottom).matrixTransform(inverseMatrix);
     }
   }
 
-  const x = Math.min(p1.x, p2.x);
-  const y = Math.min(p1.y, p2.y);
-  const w = Math.abs(p2.x - p1.x);
-  const h = Math.abs(p2.y - p1.y);
+  const x = Math.min(topLeft.x, bottomRight.x);
+  const y = Math.min(topLeft.y, bottomRight.y);
+  const boxWidth = Math.abs(bottomRight.x - topLeft.x);
+  const boxHeight = Math.abs(bottomRight.y - topLeft.y);
 
   return {
     x,
     y,
-    w,
-    h,
-    cx: x + w / 2,
-    cy: y + h / 2
+    w: boxWidth,
+    h: boxHeight,
+    cx: x + boxWidth / 2,
+    cy: y + boxHeight / 2
   };
 }
 
@@ -162,7 +162,7 @@ function initAnnotations(svg, viewportGroup, options = {}) {
 
   function getNodesMap() {
     const map = new Map();
-    const nodeElements = svg.querySelectorAll('g.node, g[class*="node"]');
+    const nodeElements = svg.querySelectorAll('g.node:not(.nodes), g[id^="flowchart-"]:not(.nodes), g[id^="state-"]:not(.nodes)');
     nodeElements.forEach(el => {
       const id = extractNodeId(el);
       if (id) {
@@ -213,7 +213,7 @@ function initAnnotations(svg, viewportGroup, options = {}) {
       return;
     }
 
-    const nodeEl = e.target.closest('g.node, g[class*="node"]');
+    const nodeEl = e.target.closest('g.node:not(.nodes), g[id^="flowchart-"]:not(.nodes), g[id^="state-"]:not(.nodes)');
     if (!nodeEl) return;
 
     const nodeId = extractNodeId(nodeEl);
@@ -226,7 +226,7 @@ function initAnnotations(svg, viewportGroup, options = {}) {
   svg.addEventListener('click', onClick);
 
   function updateNodeCursors() {
-    const nodes = svg.querySelectorAll('g.node, g[class*="node"]');
+    const nodes = svg.querySelectorAll('g.node:not(.nodes), g[id^="flowchart-"]:not(.nodes), g[id^="state-"]:not(.nodes)');
     nodes.forEach(n => {
       n.style.cursor = 'pointer';
     });

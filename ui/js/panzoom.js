@@ -179,10 +179,10 @@ function initPanZoom(svg, viewport, options = {}) {
   window.addEventListener('mouseup', onMouseUp);
   svg.addEventListener('wheel', onWheel, { passive: false });
 
-  // Bind toolbar action buttons if present
-  const btnZoomIn = options.btnZoomIn || document.getElementById('btn-zoom-in');
-  const btnZoomOut = options.btnZoomOut || document.getElementById('btn-zoom-out');
-  const btnResetView = options.btnResetView || document.getElementById('btn-reset-view');
+  // Bind toolbar action buttons if explicitly provided in options
+  const btnZoomIn = options.btnZoomIn || null;
+  const btnZoomOut = options.btnZoomOut || null;
+  const btnResetView = options.btnResetView || null;
 
   const zoomInHandler = () => {
     const rect = svg.getBoundingClientRect();

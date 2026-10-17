@@ -21,7 +21,7 @@ const DEFAULT_EXPORT_CONFIG = {
 
 /**
  * Prepares a standalone, valid XML/SVG markup string from raw SVG text or serialized DOM.
- * Ensures root namespaces, dark slate canvas background, and typography styles are injected.
+ * Ensures root namespaces, dark slate canvas background, and typography styles are present.
  */
 function prepareStandaloneSvgString(rawSvg, options = {}) {
   const config = Object.assign({}, DEFAULT_EXPORT_CONFIG, options);
@@ -62,6 +62,39 @@ function prepareStandaloneSvgString(rawSvg, options = {}) {
 }
 
 /**
+ * Normalizes an SVG DOM element for standalone export by injecting namespaces,
+ * background rect, and resetting interactive pan/zoom viewport transforms.
+ */
+function prepareExportClone(svg, config = DEFAULT_EXPORT_CONFIG) {
+  const clone = svg.cloneNode(true);
+
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  clone.setAttribute('version', '1.1');
+
+  // Reset viewport transform so diagram exports at natural 1.0 scale without pan clipping
+  const vp = clone.querySelector('#viewport');
+  if (vp) {
+    vp.setAttribute('transform', 'translate(0, 0) scale(1)');
+  }
+
+  // Prepend dark slate background rect
+  const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bgRect.setAttribute('width', '100%');
+  bgRect.setAttribute('height', '100%');
+  bgRect.setAttribute('fill', config.backgroundColor || DEFAULT_EXPORT_CONFIG.backgroundColor);
+
+  // Prepend typography style block
+  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  styleEl.textContent = `text, tspan { font-family: ${config.fontFamily || DEFAULT_EXPORT_CONFIG.fontFamily}; }`;
+
+  clone.insertBefore(styleEl, clone.firstChild);
+  clone.insertBefore(bgRect, clone.firstChild);
+
+  return clone;
+}
+
+/**
  * Exports an SVG element as a standalone downloadable file.
  *
  * @param {SVGSVGElement} svg - Target SVG DOM element.
@@ -77,10 +110,14 @@ function exportDiagramAsSvg(svg, options = {}) {
   const serializer = (typeof XMLSerializer !== 'undefined') ? new XMLSerializer() : null;
   if (!serializer) return;
 
-  const clone = svg.cloneNode(true);
-
-  const rawXml = serializer.serializeToString(clone);
-  const finalSvgString = prepareStandaloneSvgString(rawXml, config);
+  let finalSvgString = '';
+  if (typeof document !== 'undefined' && document.createElementNS) {
+    const preparedClone = prepareExportClone(svg, config);
+    finalSvgString = serializer.serializeToString(preparedClone);
+  } else {
+    const rawXml = serializer.serializeToString(svg.cloneNode(true));
+    finalSvgString = prepareStandaloneSvgString(rawXml, config);
+  }
 
   const blob = new Blob([finalSvgString], { type: 'image/svg+xml;charset=utf-8' });
   const downloadUrl = URL.createObjectURL(blob);
@@ -95,31 +132,12 @@ function exportDiagramAsSvg(svg, options = {}) {
   URL.revokeObjectURL(downloadUrl);
 }
 
-/**
- * Binds export button click listener.
- */
-function initExportButton(buttonElement, svgGetter, options = {}) {
-  const btn = buttonElement || document.getElementById('btn-export-svg');
-  if (!btn) return null;
-
-  const handler = () => {
-    const svgEl = typeof svgGetter === 'function' ? svgGetter() : svgGetter;
-    exportDiagramAsSvg(svgEl, options);
-  };
-
-  btn.addEventListener('click', handler);
-
-  return {
-    destroy: () => btn.removeEventListener('click', handler)
-  };
-}
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DEFAULT_EXPORT_CONFIG,
     prepareStandaloneSvgString,
-    exportDiagramAsSvg,
-    initExportButton
+    prepareExportClone,
+    exportDiagramAsSvg
   };
 }
 
@@ -127,7 +145,7 @@ if (typeof window !== 'undefined') {
   window.SvgExporter = {
     DEFAULT_EXPORT_CONFIG,
     prepareStandaloneSvgString,
-    exportDiagramAsSvg,
-    initExportButton
+    prepareExportClone,
+    exportDiagramAsSvg
   };
 }
