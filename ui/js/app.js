@@ -79,14 +79,15 @@
   };
 
   // DOM Elements
-  const svg = typeof document !== 'undefined' ? document.getElementById('sage-canvas') : null;
-  const viewport = typeof document !== 'undefined' ? document.getElementById('viewport') : null;
-  const edgesLayer = typeof document !== 'undefined' ? document.getElementById('edges-layer') : null;
-  const nodesLayer = typeof document !== 'undefined' ? document.getElementById('nodes-layer') : null;
-  const warningBanner = typeof document !== 'undefined' ? document.getElementById('warning-banner') : null;
-  const warningMessage = typeof document !== 'undefined' ? document.getElementById('warning-message') : null;
-  const liveDot = typeof document !== 'undefined' ? document.getElementById('live-dot') : null;
-  const liveText = typeof document !== 'undefined' ? document.getElementById('live-text') : null;
+  const getEl = id => typeof document !== 'undefined' ? document.getElementById(id) : null;
+  const svg = getEl('sage-canvas');
+  const viewport = getEl('viewport');
+  const edgesLayer = getEl('edges-layer');
+  const nodesLayer = getEl('nodes-layer');
+  const warningBanner = getEl('warning-banner');
+  const warningMessage = getEl('warning-message');
+  const liveDot = getEl('live-dot');
+  const liveText = getEl('live-text');
 
   // Rough.js SVG instance
   let rc = null;
@@ -701,12 +702,10 @@
    * TWEAK HERE: Default mode can be changed between 'light' and 'dark'.
    */
   function getActiveThemePalette(override) {
-    if (override === 'dark') return PALETTE.dark;
-    if (override === 'light') return PALETTE.light;
+    if (PALETTE[override]) return PALETTE[override];
     if (typeof document !== 'undefined') {
       const themeAttr = document.documentElement.getAttribute('data-theme');
-      if (themeAttr === 'dark') return PALETTE.dark;
-      if (themeAttr === 'light') return PALETTE.light;
+      if (PALETTE[themeAttr]) return PALETTE[themeAttr];
       if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         return PALETTE.dark;
       }

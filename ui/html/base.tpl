@@ -27,6 +27,7 @@
 
     /* TWEAK HERE: Modify dark mode palette hex values */
     @media (prefers-color-scheme: dark) {
+      :root,
       :root:not([data-theme="light"]) {
         --bg: #17171c;
         --surface: #202027;
@@ -68,6 +69,12 @@
       font-family: 'Caveat', cursive, sans-serif;
       font-size: 20px;
     }
+    /* Action toolbar buttons styled with theme tokens */
+    .btn-action {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
     /* Disable default user select on interactive canvas during pan/drag */
     #sage-canvas { user-select: none; -webkit-user-select: none; }
   </style>
@@ -103,12 +110,12 @@
       </div>
 
       <!-- Quick Action Controls (Zoom In, Zoom Out, Reset View, Export SVG):
-           CUSTOMIZATION: Buttons styled with semantic tokens (var(--surface), var(--line), var(--ink)) -->
+           CUSTOMIZATION: Buttons styled with .btn-action class -->
       <div class="flex items-center space-x-1 pl-3" style="border-left: 1px solid var(--line);">
-        <button id="btn-zoom-in" title="Zoom In" class="px-2 py-1 text-xs rounded transition-opacity hover:opacity-80" style="background: var(--surface); border: 1px solid var(--line); color: var(--ink);">Zoom In</button>
-        <button id="btn-zoom-out" title="Zoom Out" class="px-2 py-1 text-xs rounded transition-opacity hover:opacity-80" style="background: var(--surface); border: 1px solid var(--line); color: var(--ink);">Zoom Out</button>
-        <button id="btn-reset-view" title="Reset View" class="px-2 py-1 text-xs rounded transition-opacity hover:opacity-80" style="background: var(--surface); border: 1px solid var(--line); color: var(--ink);">Reset View</button>
-        <button id="btn-export-svg" title="Export SVG" class="px-2 py-1 text-xs rounded transition-opacity hover:opacity-80" style="background: var(--surface); border: 1px solid var(--line); color: var(--ink);">Export SVG</button>
+        <button id="btn-zoom-in" title="Zoom In" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Zoom In</button>
+        <button id="btn-zoom-out" title="Zoom Out" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Zoom Out</button>
+        <button id="btn-reset-view" title="Reset View" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Reset View</button>
+        <button id="btn-export-svg" title="Export SVG" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Export SVG</button>
       </div>
     </div>
   </header>
@@ -130,7 +137,7 @@
 
   <!-- Main Visualizer SVG Canvas Container:
        CUSTOMIZATION: Change canvas background color via var(--bg) -->
-  <main class="flex-1 relative overflow-hidden" style="background: var(--bg);">
+  <main class="flex-1 relative overflow-hidden" style="background: var(--bg); color: var(--ink);">
     <div id="diagram-stage" class="w-full h-full flex items-center justify-center">
       <svg id="sage-canvas" class="w-full h-full cursor-grab active:cursor-grabbing">
         <defs>
