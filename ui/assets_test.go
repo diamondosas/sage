@@ -113,7 +113,12 @@ func TestBaseTemplateRendering(t *testing.T) {
 		`/static/js/export.js`,
 		`Caveat`,
 		`/static/fonts/Caveat-Regular.ttf`,
-		`bg-slate-900`,
+		`--bg: #fbf9f4;`,
+		`--bg: #17171c;`,
+		`var(--bg)`,
+		`var(--surface)`,
+		`var(--ink)`,
+		`var(--line)`,
 	}
 
 	for _, sub := range requiredSubstrings {

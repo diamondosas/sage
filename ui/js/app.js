@@ -79,14 +79,14 @@
   };
 
   // DOM Elements
-  const svg = document.getElementById('sage-canvas');
-  const viewport = document.getElementById('viewport');
-  const edgesLayer = document.getElementById('edges-layer');
-  const nodesLayer = document.getElementById('nodes-layer');
-  const warningBanner = document.getElementById('warning-banner');
-  const warningMessage = document.getElementById('warning-message');
-  const liveDot = document.getElementById('live-dot');
-  const liveText = document.getElementById('live-text');
+  const svg = typeof document !== 'undefined' ? document.getElementById('sage-canvas') : null;
+  const viewport = typeof document !== 'undefined' ? document.getElementById('viewport') : null;
+  const edgesLayer = typeof document !== 'undefined' ? document.getElementById('edges-layer') : null;
+  const nodesLayer = typeof document !== 'undefined' ? document.getElementById('nodes-layer') : null;
+  const warningBanner = typeof document !== 'undefined' ? document.getElementById('warning-banner') : null;
+  const warningMessage = typeof document !== 'undefined' ? document.getElementById('warning-message') : null;
+  const liveDot = typeof document !== 'undefined' ? document.getElementById('live-dot') : null;
+  const liveText = typeof document !== 'undefined' ? document.getElementById('live-text') : null;
 
   // Rough.js SVG instance
   let rc = null;
@@ -633,7 +633,7 @@
     return div.innerHTML;
   }
 
-  const dismissBtn = document.getElementById('btn-dismiss-warning');
+  const dismissBtn = typeof document !== 'undefined' ? document.getElementById('btn-dismiss-warning') : null;
   if (dismissBtn && warningBanner) {
     dismissBtn.addEventListener('click', () => warningBanner.classList.add('hidden'));
   }
@@ -665,43 +665,109 @@
   // MERMAID RENDERING PIPELINE
   // =========================================================================
 
-  // Calibrated dark slate palette variables for Mermaid diagram theme.
-  // Variables can be tweaked here to customize stroke, text, background, and node accents:
-  // - background: Canvas stage background color (#0f172a / bg-slate-900)
-  // - primaryColor: Default node surface fill (#1e293b / bg-slate-800)
-  // - primaryBorderColor: High-contrast node boundary (#60a5fa / light blue)
-  // - primaryTextColor: High-contrast legible text (#f8fafc / slate-50)
-  // - lineColor: Dependency arrow stroke (#94a3b8 / slate-400)
   // TWEAK HERE: Adjust diagram font family and size
   const MERMAID_FONT_FAMILY = "'Caveat', cursive, sans-serif";
   const MERMAID_FONT_SIZE = "20px";
 
-  // Calibrated dark slate palette variables for Mermaid diagram theme.
-  // Variables can be tweaked here to customize stroke, text, background, and node accents:
-  // - background: Canvas stage background color (#0f172a / bg-slate-900)
-  // - primaryColor: Default node surface fill (#1e293b / bg-slate-800)
-  // - primaryBorderColor: High-contrast node boundary (#60a5fa / light blue)
-  // - primaryTextColor: High-contrast legible text (#f8fafc / slate-50)
-  // - lineColor: Dependency arrow stroke (#94a3b8 / slate-400)
-  const MERMAID_THEME_VARIABLES = {
-    fontFamily: MERMAID_FONT_FAMILY,
-    fontSize: MERMAID_FONT_SIZE,
-    background: '#0f172a',
-    primaryColor: '#1e293b',
-    primaryTextColor: '#f8fafc',
-    primaryBorderColor: '#60a5fa',
-    lineColor: '#94a3b8',
-    secondaryColor: '#334155',
-    tertiaryColor: '#1e293b',
-    clusterBkg: '#1e293b',
-    clusterBorder: '#475569',
-    edgeLabelBackground: '#1e293b',
-    nodeBorder: '#60a5fa',
-    mainBkg: '#1e293b',
-    labelTextColor: '#f8fafc'
+  // THEME COLOR VARIABLES
+  // TWEAK HERE: Modify these hex values to customize theme colors
+  const PALETTE = {
+    light: {
+      bg: '#fbf9f4',
+      surface: '#ffffff',
+      ink: '#2b2a33',
+      muted: '#6c6a78',
+      line: '#d9d4c7',
+      accent: '#e4572e',
+      node: '#bcd4ff',
+      node2: '#ffe3a3',
+      note: '#fff3b0'
+    },
+    dark: {
+      bg: '#17171c',
+      surface: '#202027',
+      ink: '#ececf1',
+      muted: '#9a98a8',
+      line: '#3a3a46',
+      accent: '#ff7a59',
+      node: '#3f5f94',
+      node2: '#8a6a22',
+      note: '#5c5320'
+    }
   };
 
+  /**
+   * Resolve active theme palette based on explicit setting, data-theme, or system dark mode.
+   * TWEAK HERE: Default mode can be changed between 'light' and 'dark'.
+   */
+  function getActiveThemePalette(override) {
+    if (override === 'dark') return PALETTE.dark;
+    if (override === 'light') return PALETTE.light;
+    if (typeof document !== 'undefined') {
+      const themeAttr = document.documentElement.getAttribute('data-theme');
+      if (themeAttr === 'dark') return PALETTE.dark;
+      if (themeAttr === 'light') return PALETTE.light;
+      if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return PALETTE.dark;
+      }
+    }
+    return PALETTE.light;
+  }
+
+  /**
+   * Map semantic palette tokens into Mermaid theme variables.
+   * TWEAK HERE: Adjust node, line, or cluster color mappings if desired.
+   */
+  function getMermaidThemeVariables(palette = getActiveThemePalette()) {
+    return {
+      fontFamily: MERMAID_FONT_FAMILY,
+      fontSize: MERMAID_FONT_SIZE,
+      background: palette.bg,
+      textColor: palette.ink,
+      titleColor: palette.ink,
+      primaryColor: palette.node,
+      primaryTextColor: palette.ink,
+      primaryBorderColor: palette.ink,
+      lineColor: palette.ink,
+      secondaryColor: palette.node2,
+      tertiaryColor: palette.surface,
+      clusterBkg: palette.node2,
+      clusterBorder: palette.ink,
+      edgeLabelBackground: palette.surface,
+      nodeBorder: palette.ink,
+      mainBkg: palette.node,
+      labelTextColor: palette.ink,
+      noteBkgColor: palette.note,
+      noteTextColor: palette.ink,
+      noteBorderColor: palette.ink,
+      actorBkg: palette.node,
+      actorBorder: palette.ink,
+      actorTextColor: palette.ink,
+      actorLineColor: palette.muted,
+      signalColor: palette.ink,
+      signalTextColor: palette.ink
+    };
+  }
+
+  const MERMAID_THEME_VARIABLES = getMermaidThemeVariables(PALETTE.light);
+
   let mermaidRenderCounter = 0;
+  let lastMermaidSource = null;
+
+  // Re-render automatically when system color scheme changes (light <-> dark)
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const darkModeMatcher = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = () => {
+      if (lastMermaidSource) {
+        renderMermaidDiagram(lastMermaidSource);
+      }
+    };
+    if (darkModeMatcher.addEventListener) {
+      darkModeMatcher.addEventListener('change', handleThemeChange);
+    } else if (darkModeMatcher.addListener) {
+      darkModeMatcher.addListener(handleThemeChange);
+    }
+  }
 
   async function renderMermaidDiagram(mermaidSource) {
     if (typeof mermaid === 'undefined') {
@@ -709,8 +775,10 @@
       return;
     }
 
+    lastMermaidSource = mermaidSource;
+
     // Await font load prior to mermaid.render so text bounding boxes calculate accurately
-    if (document.fonts && document.fonts.load) {
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.load) {
       try {
         await document.fonts.load(`700 ${MERMAID_FONT_SIZE} Caveat`);
         await document.fonts.ready;
@@ -719,12 +787,16 @@
       }
     }
 
+    const activePalette = getActiveThemePalette();
+    const activeThemeVariables = getMermaidThemeVariables(activePalette);
+
     mermaid.initialize({
       startOnLoad: false,
       theme: 'base',
       securityLevel: 'loose',
       fontFamily: MERMAID_FONT_FAMILY,
-      themeVariables: MERMAID_THEME_VARIABLES
+      fontSize: MERMAID_FONT_SIZE,
+      themeVariables: activeThemeVariables
     });
 
     const stage = document.getElementById('diagram-stage');
@@ -846,10 +918,22 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   }
 
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      MERMAID_FONT_FAMILY,
+      MERMAID_FONT_SIZE,
+      MERMAID_THEME_VARIABLES,
+      PALETTE,
+      getActiveThemePalette,
+      getMermaidThemeVariables
+    };
+  }
 })();
