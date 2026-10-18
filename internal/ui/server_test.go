@@ -137,7 +137,7 @@ func TestServer_StaticAssets(t *testing.T) {
 		"/static/js/panzoom.js",
 		"/static/js/annotations.js",
 		"/static/js/export.js",
-		"/static/fonts/PatrickHand-Regular.ttf",
+		"/static/fonts/Caveat-Regular.ttf",
 		"/static/js/app.js",
 	}
 

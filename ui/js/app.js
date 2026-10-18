@@ -672,9 +672,20 @@
   // - primaryBorderColor: High-contrast node boundary (#60a5fa / light blue)
   // - primaryTextColor: High-contrast legible text (#f8fafc / slate-50)
   // - lineColor: Dependency arrow stroke (#94a3b8 / slate-400)
+  // TWEAK HERE: Adjust diagram font family and size
+  const MERMAID_FONT_FAMILY = "'Caveat', cursive, sans-serif";
+  const MERMAID_FONT_SIZE = "20px";
+
+  // Calibrated dark slate palette variables for Mermaid diagram theme.
+  // Variables can be tweaked here to customize stroke, text, background, and node accents:
+  // - background: Canvas stage background color (#0f172a / bg-slate-900)
+  // - primaryColor: Default node surface fill (#1e293b / bg-slate-800)
+  // - primaryBorderColor: High-contrast node boundary (#60a5fa / light blue)
+  // - primaryTextColor: High-contrast legible text (#f8fafc / slate-50)
+  // - lineColor: Dependency arrow stroke (#94a3b8 / slate-400)
   const MERMAID_THEME_VARIABLES = {
-    fontFamily: "'Patrick Hand', cursive, sans-serif",
-    fontSize: '18px',
+    fontFamily: MERMAID_FONT_FAMILY,
+    fontSize: MERMAID_FONT_SIZE,
     background: '#0f172a',
     primaryColor: '#1e293b',
     primaryTextColor: '#f8fafc',
@@ -698,12 +709,13 @@
       return;
     }
 
-    // Wait for Patrick Hand font to load if supported by browser
+    // Await font load prior to mermaid.render so text bounding boxes calculate accurately
     if (document.fonts && document.fonts.load) {
       try {
-        await document.fonts.load('18px "Patrick Hand"');
+        await document.fonts.load(`700 ${MERMAID_FONT_SIZE} Caveat`);
+        await document.fonts.ready;
       } catch (e) {
-        // Fallback gracefully if font load check fails
+        console.warn('Font loading check completed with fallback', e);
       }
     }
 
@@ -711,7 +723,7 @@
       startOnLoad: false,
       theme: 'base',
       securityLevel: 'loose',
-      fontFamily: "'Patrick Hand', cursive, sans-serif",
+      fontFamily: MERMAID_FONT_FAMILY,
       themeVariables: MERMAID_THEME_VARIABLES
     });
 

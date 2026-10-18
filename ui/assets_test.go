@@ -30,7 +30,7 @@ func TestStaticAssetsServed(t *testing.T) {
 		{"/js/panzoom.js", "javascript"},
 		{"/js/annotations.js", "javascript"},
 		{"/js/export.js", "javascript"},
-		{"/fonts/PatrickHand-Regular.ttf", "font"},
+		{"/fonts/Caveat-Regular.ttf", "font"},
 	}
 
 	for _, asset := range assetPaths {
@@ -111,8 +111,8 @@ func TestBaseTemplateRendering(t *testing.T) {
 		`/static/js/panzoom.js`,
 		`/static/js/annotations.js`,
 		`/static/js/export.js`,
-		`Patrick Hand`,
-		`/static/fonts/PatrickHand-Regular.ttf`,
+		`Caveat`,
+		`/static/fonts/Caveat-Regular.ttf`,
 		`bg-slate-900`,
 	}
 

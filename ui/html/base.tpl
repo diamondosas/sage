@@ -11,19 +11,18 @@
 
   <style>
     /* Local handwriting font definition for 100% offline diagram rendering */
+    /* TWEAK HERE: Update font-family or swap font weight if needed */
     @font-face {
-      font-family: 'Patrick Hand';
-      font-style: normal;
-      font-weight: 400;
-      src: url('/static/fonts/PatrickHand-Regular.ttf') format('truetype');
-      font-display: swap;
+      font-family: 'Caveat';
+      src: url('/static/fonts/Caveat-Regular.ttf') format('truetype');
     }
 
     /* CUSTOMIZATION: Change font family to match your preferred typography */
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    /* Apply Patrick Hand handwriting font to Mermaid diagram elements */
+    /* Apply Caveat handwriting font to Mermaid diagram elements */
     .mermaid text, .mermaid tspan, #sage-canvas text, #diagram-stage text {
-      font-family: 'Patrick Hand', cursive, sans-serif;
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 20px;
     }
     /* Disable default user select on interactive canvas during pan/drag */
     #sage-canvas { user-select: none; -webkit-user-select: none; }
