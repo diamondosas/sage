@@ -28,15 +28,13 @@
   // Rough.js sketchy drawing parameters.
   // - roughness: 0.0 is completely clean/flat; 1.5 is standard sketchy; 2.5 is very rough.
   // - bowing: Curvature deviation of straight lines.
-  // - fillStyle: 'hachure', 'solid', 'cross-hatch', 'dots', or 'zigzag'.
+  // - fillStyle: 'solid' (clean hand-drawn fill) or 'none' (stroke-only).
   const ROUGH_DEFAULTS = {
     roughness: 1.4,
     bowing: 1.0,
     strokeWidth: 1.6,
-    fillStyle: 'hachure',
-    fillWeight: 1.2,
-    hachureAngle: 60,
-    hachureGap: 6
+    fillStyle: 'solid',
+    fillWeight: 1.0
   };
 
   // Color palette definitions for node outlines, fills, and labels.
@@ -814,7 +812,7 @@
         const viewportEl = wrapInViewport(svgEl);
 
         // Post-processing sketch engine: replace standard geometric shapes with hand-drawn sketchy twins
-        // TWEAK HERE: Pass custom parameter overrides to sketchify(svgEl, { roughness, bowing, hachureGap, fillWeight })
+        // TWEAK HERE: Pass custom parameter overrides to sketchify(svgEl, { roughness, bowing, fillStyle, fillWeight })
         if (typeof sketchify === 'function') {
           sketchify(svgEl);
         }
