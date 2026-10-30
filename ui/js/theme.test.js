@@ -72,3 +72,81 @@ test('getMermaidThemeVariables correctly maps active palette to Mermaid theme pr
   assert.equal(darkVars.edgeLabelBackground, '#202027');
   assert.equal(darkVars.labelTextColor, '#ececf1');
 });
+
+const { mermaidConfig, DEFAULT_OPTIONS } = require('./app.js');
+
+test('mermaidConfig sets up handDrawn look, deterministic seed, and base theme by default', () => {
+  const config = mermaidConfig();
+  assert.equal(config.startOnLoad, false);
+  assert.equal(config.theme, 'base');
+  assert.equal(config.look, 'handDrawn');
+  assert.equal(config.handDrawnSeed, 7);
+  assert.equal(config.fontFamily, MERMAID_FONT_FAMILY);
+  assert.equal(config.fontSize, MERMAID_FONT_SIZE);
+  assert.ok(config.themeVariables);
+  assert.equal(config.themeVariables.background, '#fbf9f4');
+  assert.equal(config.themeVariables.textColor, '#2b2a33');
+});
+
+test('mermaidConfig allows overriding look, seed, font, and custom colors', () => {
+  const config = mermaidConfig({
+    look: 'classic',
+    seed: 99,
+    font: 'sans-serif',
+    fontSize: '14px',
+    colors: {
+      bg: '#000000',
+      ink: '#ffffff',
+      surface: '#111111',
+      node: '#222222',
+      node2: '#333333',
+      note: '#444444',
+      muted: '#888888'
+    }
+  });
+
+  assert.equal(config.look, 'classic');
+  assert.equal(config.handDrawnSeed, 99);
+  assert.equal(config.fontFamily, 'sans-serif');
+  assert.equal(config.fontSize, '14px');
+  assert.equal(config.themeVariables.background, '#000000');
+  assert.equal(config.themeVariables.textColor, '#ffffff');
+  assert.equal(config.themeVariables.primaryColor, '#222222');
+});
+
+const { ensureClusterSolidFill } = require('./app.js');
+
+test('ensureClusterSolidFill fills cluster background completely without hachure gaps', () => {
+  const fillPath = {
+    style: { fill: 'none', stroke: '#ffe3a3' },
+    setAttribute(k, v) { this[k] = v; }
+  };
+  const strokePath = {
+    style: { stroke: '#2b2a33' },
+    setAttribute(k, v) { this[k] = v; }
+  };
+  const clusterEl = {
+    querySelectorAll(selector) {
+      if (selector === 'path') return [fillPath, strokePath];
+      if (selector === 'rect') return [];
+      return [];
+    }
+  };
+  const mockSvg = {
+    querySelectorAll(selector) {
+      if (selector === '.cluster') return [clusterEl];
+      return [];
+    }
+  };
+
+  ensureClusterSolidFill(mockSvg, { node2: '#ffe3a3', ink: '#2b2a33' });
+
+  assert.equal(fillPath.style.fill, '#ffe3a3');
+  assert.equal(fillPath.style.stroke, 'none');
+  assert.equal(fillPath.fill, '#ffe3a3');
+  assert.equal(fillPath.stroke, 'none');
+  assert.equal(strokePath.style.stroke, '#2b2a33');
+  assert.equal(strokePath.stroke, '#2b2a33');
+});
+
+

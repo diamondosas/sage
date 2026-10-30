@@ -19,7 +19,9 @@
     fillStyle: 'solid',    // 'solid' for crisp hand-drawn fills; 'none' for stroke-only
     fillWeight: 1.0,
     seed: 7,               // Deterministic seed for repeatable sketch layout
-    clusterBkg: '#ffe3a3'  // Default soft pastel fill tint for architectural subgraphs / clusters
+    clusterBkg: '#ffe3a3', // Default soft pastel fill tint for architectural subgraphs / clusters
+    // TWEAK HERE: Fallback ink stroke color for connectors and diagram elements
+    ink: '#2b2a33'
   };
 
   /**
@@ -27,6 +29,32 @@
    */
   function isClear(color) {
     return !color || color === 'none' || color === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(color);
+  }
+
+  /**
+   * Resolves the active ink color from CSS variables or config.
+   * TWEAK HERE: Modify fallback ink color if needed.
+   */
+  function resolveInkColor(cfg) {
+    if (cfg && cfg.ink && cfg.ink !== DEFAULT_SKETCH_CONFIG.ink && !isClear(cfg.ink)) {
+      return cfg.ink;
+    }
+    if (typeof window !== 'undefined' && window.getComputedStyle && typeof document !== 'undefined' && document.documentElement) {
+      const inkVal = window.getComputedStyle(document.documentElement).getPropertyValue('--ink');
+      if (inkVal && inkVal.trim()) return inkVal.trim();
+    }
+    return (cfg && cfg.ink && !isClear(cfg.ink)) ? cfg.ink : DEFAULT_SKETCH_CONFIG.ink;
+  }
+
+  /**
+   * Extracts marker attribute or computed style (marker-end / marker-start).
+   */
+  function getMarkerValue(el, markerName, domStyle) {
+    const attr = el.getAttribute ? el.getAttribute(markerName) : null;
+    if (attr && attr !== 'none') return attr;
+    const camel = markerName === 'marker-end' ? 'markerEnd' : 'markerStart';
+    const styleVal = domStyle ? (domStyle[camel] || domStyle[markerName]) : null;
+    return (styleVal && styleVal !== 'none') ? styleVal : '';
   }
 
   /**
@@ -44,12 +72,22 @@
     const cfg = Object.assign({}, DEFAULT_SKETCH_CONFIG, config || {});
 
     const cs = computedStyle || {};
-    const stroke = (cs.stroke && !isClear(cs.stroke)) ? cs.stroke : 'none';
-    const fill = (cs.fill && !isClear(cs.fill)) ? cs.fill : 'none';
-    const strokeWidth = parseFloat(cs.strokeWidth) || cfg.strokeWidth;
+    const inkColor = resolveInkColor(cfg);
+    const isConnector = Boolean(cs.isConnector);
+
+    let stroke = (cs.stroke && !isClear(cs.stroke)) ? cs.stroke : 'none';
+    if (isConnector && isClear(stroke)) {
+      stroke = inkColor;
+    }
+
+    // TWEAK HERE: Minimum connector stroke width and marker alignment
+    const rawStrokeWidth = parseFloat(cs.strokeWidth);
+    const strokeWidth = Math.max(cfg.strokeWidth, !isNaN(rawStrokeWidth) ? rawStrokeWidth : cfg.strokeWidth);
 
     const hasStroke = !isClear(stroke);
-    const hasFill = tagName !== 'line' && !isClear(fill) && cfg.fillStyle !== 'none';
+
+    // Connector paths or open paths must never have closed fill
+    const hasFill = tagName !== 'line' && !isConnector && !isClear(cs.fill) && cfg.fillStyle !== 'none';
 
     const markerEnd = cs.markerEnd || cs['marker-end'] || '';
     const markerStart = cs.markerStart || cs['marker-start'] || '';
@@ -59,17 +97,18 @@
       roughness: cfg.roughness,
       bowing: cfg.bowing,
       stroke: hasStroke ? stroke : 'none',
-      strokeWidth: Math.max(cfg.strokeWidth, strokeWidth),
-      fill: hasFill ? fill : undefined,
+      strokeWidth: strokeWidth,
+      fill: hasFill ? cs.fill : undefined,
       fillStyle: cfg.fillStyle,
       fillWeight: cfg.fillWeight,
       seed: seed !== undefined ? seed : cfg.seed,
-      // Disable multi-stroke when markers exist so connector arrowheads align cleanly
-      disableMultiStroke: hasMarker
+      // TWEAK HERE: Keep markers locked to line endpoints by disabling multi-stroke on marked or thick lines
+      disableMultiStroke: hasMarker || strokeWidth > 6
     };
 
-    if (cs.strokeDasharray && cs.strokeDasharray !== 'none') {
-      opt.strokeLineDash = cs.strokeDasharray.split(/[\s,]+/).map(parseFloat).filter(function (n) { return !isNaN(n); });
+    const dasharray = cs.strokeDasharray || cs['stroke-dasharray'];
+    if (dasharray && dasharray !== 'none') {
+      opt.strokeLineDash = String(dasharray).split(/[\s,]+/).map(parseFloat).filter(function (n) { return !isNaN(n); });
     }
 
     return opt;
@@ -109,27 +148,47 @@
     elements.forEach(function (el) {
       try {
         // Guard against double sketchification and protect text labels & marker defs
-        if (el.closest && el.closest('[data-sketchy="true"], defs, marker, .edgeLabel, foreignObject, .labelBkg, text, tspan')) {
+        if (el.closest && el.closest('[data-sketchy="true"], defs, marker, clipPath, mask, pattern, .edgeLabel, foreignObject, .labelBkg, text, tspan')) {
           return;
         }
 
         // Compute element style prioritizing CSS cascade over presentation attributes
         const domStyle = typeof window !== 'undefined' && window.getComputedStyle ? window.getComputedStyle(el) : (el.style || {});
+
         const strokeAttr = el.getAttribute ? el.getAttribute('stroke') : null;
         const fillAttr = el.getAttribute ? el.getAttribute('fill') : null;
         const strokeWidthAttr = el.getAttribute ? el.getAttribute('stroke-width') : null;
-        const markerEndAttr = el.getAttribute ? el.getAttribute('marker-end') : null;
-        const markerStartAttr = el.getAttribute ? el.getAttribute('marker-start') : null;
-        const dashAttr = el.getAttribute ? el.getAttribute('stroke-dasharray') : null;
+        const dashAttr = (el.getAttribute ? el.getAttribute('stroke-dasharray') : null) ||
+                         (domStyle.getPropertyValue ? domStyle.getPropertyValue('stroke-dasharray') : null) ||
+                         domStyle.strokeDasharray;
+
+        // Check if element belongs to a node component (e.g. cylinder/icon shape paths)
+        const isNode = Boolean(el.closest && el.closest('.node, .nodes')) ||
+                      Boolean(el.classList && el.classList.contains('node'));
 
         // Detect if element represents a subgraph cluster
-        const isCluster = Boolean(
+        const isCluster = !isNode && (Boolean(
           (el.closest && (el.closest('.cluster, .clusters') || el.closest('[id^="subGraph"]'))) &&
           (!el.closest('.node, .nodes'))
-        ) || Boolean(el.classList && (el.classList.contains('cluster') || el.classList.contains('cluster-rect')));
+        ) || Boolean(el.classList && (el.classList.contains('cluster') || el.classList.contains('cluster-rect'))));
+
+        // Extract markers (from attributes or computed style)
+        const markerEndVal = getMarkerValue(el, 'marker-end', domStyle);
+        const markerStartVal = getMarkerValue(el, 'marker-start', domStyle);
+
+        // Detect if element represents an edge connector path
+        // TWEAK HERE: Add custom selector classes for edge connectors if extending diagram types
+        const isConnector = !isNode && (el.tagName === 'path' || el.tagName === 'line') && (
+          Boolean(el.classList && (el.classList.contains('path') || el.classList.contains('flowchart-link'))) ||
+          Boolean(el.closest && el.closest('.edgePaths, .edgePath')) ||
+          Boolean(markerEndVal || markerStartVal) ||
+          (el.tagName === 'path' && (!fillAttr || fillAttr === 'none'))
+        );
 
         let resolvedFill = (domStyle.fill && !isClear(domStyle.fill)) ? domStyle.fill : fillAttr;
-        if (isCluster) {
+        if (isConnector || (el.tagName === 'path' && (!fillAttr || fillAttr === 'none') && !isNode)) {
+          resolvedFill = 'none';
+        } else if (isCluster) {
           // Caller clusterBkg override takes priority, with fallback to computed style or default soft pastel
           if (config.clusterBkg) {
             resolvedFill = config.clusterBkg;
@@ -139,14 +198,18 @@
         }
 
         let resolvedStroke = (domStyle.stroke && !isClear(domStyle.stroke)) ? domStyle.stroke : strokeAttr;
+        if (isConnector && isClear(resolvedStroke)) {
+          resolvedStroke = resolveInkColor(config);
+        }
 
         const styleObj = {
           stroke: resolvedStroke,
           fill: resolvedFill,
           strokeWidth: strokeWidthAttr || domStyle.strokeWidth,
-          markerEnd: markerEndAttr || domStyle.markerEnd,
-          markerStart: markerStartAttr || domStyle.markerStart,
-          strokeDasharray: dashAttr || domStyle.strokeDasharray
+          markerEnd: markerEndVal,
+          markerStart: markerStartVal,
+          strokeDasharray: dashAttr,
+          isConnector: isConnector
         };
 
         const shapeOpt = extractRoughOptions(styleObj, config, el.tagName, seedCounter++);
@@ -230,8 +293,8 @@
 
           // Propagate connector arrow markers to sketchy paths
           ['marker-end', 'marker-start'].forEach(function (markerName) {
-            const markerVal = el.getAttribute ? el.getAttribute(markerName) : styleObj[markerName];
-            if (markerVal && markerVal !== 'none' && twin.querySelectorAll) {
+            const markerVal = getMarkerValue(el, markerName, domStyle);
+            if (markerVal && twin.querySelectorAll) {
               twin.querySelectorAll('path').forEach(function (p) {
                 if (p.setAttribute) p.setAttribute(markerName, markerVal);
               });

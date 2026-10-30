@@ -13,20 +13,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/diamondosas/sage/stargazers"><img src="https://img.shields.io/github/stars/diamondosas/sage" alt="Stars"></a>
 </p>
+
 [![skills.sh](https://skills.sh/b/diamondosas/sage)](https://skills.sh/diamondosas/sage)
 
-
+# Screenshots
 ---
 
-
-> [!IMPORTANT]
-> ### 📸 PLACEHOLDER: Visual Proof (Demo Video / GIF / Screenshot)
-> *Drop your demo recording or high-res UI snapshot here to showcase Sage in action.*
-> 
-> ```markdown
-> ![Sage Architecture Visualizer Demo](assets/demo.png)
-> ```
-> *Recommended: 10-15s GIF showing `sage init` -> AI agent updating `SAGE.md` -> `sage ui` launching the interactive architecture canvas.*
+![Sage Architecture Visualizer Demo](assets/demo.png)
 
 ---
 
@@ -43,15 +36,9 @@ curl -fsSL https://raw.githubusercontent.com/diamondosas/sage/main/assets/instal
 ### Option 2: via NPX / Node.js
 
 ```bash
-npx sage-codebase
+npx skills add diamondosas/sage
 ```
 
-### What this installs automatically:
-- **Sage CLI** binary (`sage`) placed in your `$PATH` (`/usr/local/bin` or `~/.local/bin`)
-- **Universal Agent Skill** installed to `~/.agents/skills/sage`
-- **Claude Code Skill** installed to `~/.claude/skills/sage`
-- **Cursor AI Skill** installed to `~/.cursor/skills/sage`
-- **Local Workspace Skill** linked to `./.agents/skills/sage` if inside a git repository
 
 ---
 
@@ -75,20 +62,6 @@ Opens `http://127.0.0.1:8080` in your browser.
 
 ---
 
-> [!NOTE]
-> ## HIGHLIGHTED SECTIONS TO ADD
-> *These recommended sections will help onboard contributors and enterprise adopters:*
-
-### [Suggested Add] How It Works: The `SAGE.md` Spec
-> [!TIP]
-> **Highlight for users:** Show how easy `SAGE.md` syntax is:
-> ```sage
-> // group: Core Engine
-> // path: internal/engine
-> rect parser "AST Parser" [blue]
-> cylinder db "Graph Store" [purple]
-> parser -> db "Persists topology"
-> ```
 
 
 ---

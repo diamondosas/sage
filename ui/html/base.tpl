@@ -69,6 +69,10 @@
       font-family: 'Caveat', cursive, sans-serif;
       font-size: 20px;
     }
+    /* Ensure cluster/subgraph groups have completely solid background fills without hachure gaps */
+    .cluster rect, .cluster > g > path:first-child, .cluster > path:first-child {
+      fill: var(--node2, #ffe3a3) !important;
+    }
     /* Action toolbar buttons styled with theme tokens */
     .btn-action {
       background: var(--surface);

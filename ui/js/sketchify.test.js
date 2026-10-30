@@ -282,3 +282,199 @@ test('sketchify respects clusterBkg caller override, stroke-only none mode, and 
   sketchify(svgNone, { fillStyle: 'none' }, mockRoughNone);
   assert.equal(callsNone[0].opt.fillStyle, 'none', 'Stroke-only none mode respected for clusters');
 });
+
+test('extractRoughOptions enforces minimum 1.5px strokeWidth, disables multi-stroke for markers or sw > 6, and extracts dashed strokeLineDash', () => {
+  // Test minimum stroke width clamp
+  const thinStyle = {
+    stroke: '#2b2a33',
+    strokeWidth: '0.5px'
+  };
+  const thinOpts = extractRoughOptions(thinStyle, DEFAULT_SKETCH_CONFIG, 'path');
+  assert.equal(thinOpts.strokeWidth, 1.5, 'Stroke width should be clamped to at least 1.5px');
+
+  // Test disableMultiStroke when sw > 6
+  const thickStyle = {
+    stroke: '#2b2a33',
+    strokeWidth: '8px'
+  };
+  const thickOpts = extractRoughOptions(thickStyle, DEFAULT_SKETCH_CONFIG, 'path');
+  assert.equal(thickOpts.disableMultiStroke, true, 'Multi-stroke should be disabled when strokeWidth > 6');
+
+  // Test dasharray parsing
+  const dashStyle = {
+    stroke: '#2b2a33',
+    strokeDasharray: '6, 3'
+  };
+  const dashOpts = extractRoughOptions(dashStyle, DEFAULT_SKETCH_CONFIG, 'path');
+  assert.deepEqual(dashOpts.strokeLineDash, [6, 3], 'Dasharray should parse into strokeLineDash array');
+
+  // Test ink fallback when stroke is missing or clear on connector
+  const clearStyle = {
+    stroke: 'none',
+    isConnector: true
+  };
+  const inkOpts = extractRoughOptions(clearStyle, { ...DEFAULT_SKETCH_CONFIG, ink: '#2b2a33' }, 'path');
+  assert.equal(inkOpts.stroke, '#2b2a33', 'Should fall back to ink color when stroke is empty/none on connector');
+
+  // Test connector path enforces fill: undefined
+  const connectorStyle = {
+    stroke: '#2b2a33',
+    fill: 'none',
+    isConnector: true
+  };
+  const connOpts = extractRoughOptions(connectorStyle, DEFAULT_SKETCH_CONFIG, 'path');
+  assert.equal(connOpts.fill, undefined, 'Connector paths must have undefined fill');
+});
+
+test('sketchify extracts connector stroke colors, falls back to ink color, enforces min 1.5px stroke, and propagates marker-end/start from attributes and computed styles', () => {
+  const calls = [];
+  const mockRough = {
+    path(d, opt) {
+      const p = createMockEl('path', { d });
+      const g = createMockEl('g', { 'data-rough': 'path' }, {}, [p]);
+      calls.push({ type: 'path', d, opt, g });
+      return g;
+    }
+  };
+
+  // Connector path with class 'path flowchart-link', no fill, no stroke attribute (relies on ink fallback), and computed markerEnd
+  const connectorPath = createMockEl('path', {
+    class: 'path flowchart-link',
+    d: 'M10,20 L100,20',
+    'stroke-dasharray': '5 5'
+  }, {
+    stroke: '', // empty stroke to test ink fallback
+    fill: 'none',
+    strokeWidth: '1px',
+    markerEnd: 'url(#flowchart-pointEnd)'
+  });
+
+  const edgePathsLayer = createMockEl('g', { class: 'edgePaths' }, {}, [connectorPath]);
+  const svg = createMockEl('svg', {}, {}, [edgePathsLayer]);
+
+  sketchify(svg, { ink: '#2b2a33' }, mockRough);
+
+  assert.equal(calls.length, 1, 'Should process connector path');
+  const edgeCall = calls[0];
+
+  assert.equal(edgeCall.opt.fill, undefined, 'Connector path must not have fill');
+  assert.equal(edgeCall.opt.stroke, '#2b2a33', 'Connector path stroke must fall back to ink color');
+  assert.equal(edgeCall.opt.strokeWidth, 1.5, 'Connector path stroke width must be at least 1.5px');
+  assert.equal(edgeCall.opt.disableMultiStroke, true, 'disableMultiStroke must be true for marked path');
+  assert.deepEqual(edgeCall.opt.strokeLineDash, [5, 5], 'strokeLineDash must preserve dasharray');
+
+  // Verify marker-end was propagated to the replacement rough path element
+  const roughPath = edgeCall.g.querySelector('path');
+  assert.ok(roughPath, 'Replacement group must contain a path element');
+  assert.equal(roughPath.getAttribute('marker-end'), 'url(#flowchart-pointEnd)', 'marker-end attribute must be attached to rough path');
+});
+
+test('sketchify ensures open connector paths ignore browser default black fills', () => {
+  const calls = [];
+  const mockRough = {
+    path(d, opt) {
+      const p = createMockEl('path', { d });
+      const g = createMockEl('g', { 'data-rough': 'path' }, {}, [p]);
+      calls.push({ type: 'path', d, opt, g });
+      return g;
+    }
+  };
+
+  // SVG connector path without fill attribute where computedStyle default in browser is black rgb(0, 0, 0)
+  const openConnector = createMockEl('path', {
+    class: 'path',
+    d: 'M0,0 C20,20 40,20 60,0',
+    stroke: '#2b2a33'
+  }, {
+    fill: 'rgb(0, 0, 0)', // browser default user-agent style
+    stroke: '#2b2a33'
+  });
+
+  const svg = createMockEl('svg', {}, {}, [openConnector]);
+
+  sketchify(svg, {}, mockRough);
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].opt.fill, undefined, 'Open connector path without fill attribute must ignore browser default fill');
+});
+
+test('sketchify preserves solid fills on node path shapes (e.g. cylinder or custom shapes)', () => {
+  const calls = [];
+  const mockRough = {
+    path(d, opt) {
+      const p = createMockEl('path', { d });
+      const g = createMockEl('g', { 'data-rough': 'path' }, {}, [p]);
+      calls.push({ type: 'path', d, opt });
+      return g;
+    }
+  };
+
+  // Node path (e.g. cylinder or icon) inside a node group with computed CSS fill
+  const nodePath = createMockEl('path', {
+    d: 'M0,0 C10,5 20,5 30,0'
+  }, {
+    fill: 'rgb(188, 212, 255)',
+    stroke: '#2b2a33'
+  });
+  const nodeGroup = createMockEl('g', { class: 'node default', id: 'dbNode' }, {}, [nodePath]);
+  const nodesLayer = createMockEl('g', { class: 'nodes' }, {}, [nodeGroup]);
+  const svg = createMockEl('svg', {}, {}, [nodesLayer]);
+
+  sketchify(svg, {}, mockRough);
+
+  assert.equal(calls.length, 1, 'Node path shape must be processed');
+  assert.equal(calls[0].opt.fill, 'rgb(188, 212, 255)', 'Node path shape must preserve solid fill');
+  assert.equal(calls[0].opt.fillStyle, 'solid', 'Node path must use solid fill style');
+});
+
+test('sketchify resolves ink stroke color from CSS variable --ink in dark mode', () => {
+  const calls = [];
+  const mockRough = {
+    path(d, opt) {
+      const p = createMockEl('path', { d });
+      const g = createMockEl('g', { 'data-rough': 'path' }, {}, [p]);
+      calls.push({ type: 'path', d, opt });
+      return g;
+    }
+  };
+
+  // Mock global window and document with dark mode --ink CSS variable
+  const originalWindow = global.window;
+  const originalDoc = global.document;
+
+  global.document = {
+    documentElement: {}
+  };
+  global.window = {
+    getComputedStyle(el) {
+      return {
+        getPropertyValue(prop) {
+          if (prop === '--ink') return '#ececf1';
+          return '';
+        }
+      };
+    }
+  };
+
+  try {
+    const connectorPath = createMockEl('path', {
+      class: 'path flowchart-link',
+      d: 'M0,0 L50,50'
+    }, {
+      stroke: '', // empty to trigger ink fallback
+      fill: 'none'
+    });
+    const edgePathsLayer = createMockEl('g', { class: 'edgePaths' }, {}, [connectorPath]);
+    const svg = createMockEl('svg', {}, {}, [edgePathsLayer]);
+
+    sketchify(svg, {}, mockRough);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].opt.stroke, '#ececf1', 'Connector path must resolve dark mode ink color from CSS variable');
+  } finally {
+    global.window = originalWindow;
+    global.document = originalDoc;
+  }
+});
+
+
