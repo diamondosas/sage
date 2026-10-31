@@ -1,0 +1,8 @@
+{
+  // File associations for syntax highlighting in VSCode.
+  // TWEAK HERE: Map additional file patterns or change "javascript" to another grammar if needed.
+  "files.associations": {
+    "**/ui/js/**/*.tpl": "javascript",
+    "**/ui/html/**/*.tpl": "go-template"
+  }
+}

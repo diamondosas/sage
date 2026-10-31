@@ -1,107 +1,99 @@
 # SAGE Architecture Language Specification (`language-syntax.md`)
 
-The standard syntax for `SAGE.md` is standard Mermaid `flowchart LR` (or `flowchart TD`) markup. AI coding agents use this specification to generate and incrementally maintain codebase architecture diagrams rendered by the `sage` visualizer.
+The standard syntax for `SAGE.md` is standard [D2 language](https://d2lang.com) markup. AI coding agents use this specification to generate and incrementally maintain codebase architecture diagrams rendered by the `sage` visualizer.
 
 ---
 
 ## 1. Golden Rule: No Assumptions
-> **CRITICAL**: The AI must never assume facts about the codebase. Every node, arrow, subgraph, and file path must be verified against actual repository files, imports, and `git status`/`git diff`. Never speculate or invent phantom modules.
+> **CRITICAL**: The AI must never assume facts about the codebase. Every node, arrow, container, and file path must be verified against actual repository files, imports, and `git status`/`git diff`. Never speculate or invent phantom modules.
 
 ---
 
 ## 2. File Format & Code Fences
-An architecture diagram file (`SAGE.md`) encloses Mermaid markup within a standard ```` ```mermaid ```` block:
+An architecture diagram file (`SAGE.md`) encloses D2 markup within a standard ```` ```d2 ```` block:
 
 ````markdown
 # Architecture Map
 
-```mermaid
-flowchart LR
-    %% CHANGE DIRECTION: Replace "LR" with "TD" to render a vertical top-to-bottom layout
-    %% Architecture diagram definitions go here
+```d2
+direction: right
+# CHANGE DIRECTION: Replace "right" with "down" to render a vertical top-to-bottom layout
 ```
 ````
 
-*(Note: Sage also provides seamless backward compatibility for legacy ```` ```sage ```` blocks via automatic on-the-fly transpilation).*
+*(Note: Sage also provides seamless backward compatibility for legacy ```` ```sage ```` blocks and raw un-fenced D2 input).*
 
 ---
 
-## 3. Subgraphs (Codebase Directory Clustering)
-Group related components into architectural subgraphs that map directly to codebase folders or domains:
+## 3. Containers (Codebase Directory Clustering)
+Group related components into architectural containers that map directly to codebase folders or domains using an identifier followed by a quoted label:
 
-```mermaid
-flowchart LR
-    %% CHANGE SUBGRAPH ID: Replace "Storage" with a unique domain identifier
-    %% CHANGE PATH/TITLE: Update the title string and verified codebase path in brackets
-    subgraph Storage ["Persistent Storage (internal/storage)"]
-        db[("PostgreSQL DB")]:::purple
-    end
+```d2
+direction: right
+
+storage: "Storage Layer (internal/storage)" {
+  # CHANGE CONTAINER: Update label and verified codebase directory in quotes
+  db: "PostgreSQL DB" {
+    shape: cylinder
+    style.fill: "#581c87"
+    style.stroke: "#c084fc"
+  }
+}
 ```
 
-- **ID**: Clean alphanumeric identifier without spaces (e.g., `CLI`, `Storage`, `Frontend`).
-- **Bracket Title**: Human-readable label enclosed in quotes with verified directory path: `["Domain Name (path/to/dir)"]`.
+- **Container Definition**: `identifier: "Human-Readable Label (path/to/dir)" { ... }`.
+- **Node Identifier**: Clean alphanumeric identifier without spaces (e.g., `db`, `api_server`, `router`).
 
 ---
 
 ## 4. Component Shapes Cheat Sheet
-Define architectural nodes using standard Mermaid geometric delimiters:
+Define architectural nodes using standard D2 shapes:
 
-| Component Type | Mermaid Syntax | Delimiter | Semantic Role |
+| Component Type | D2 Syntax | Shape Value | Semantic Role |
 | :--- | :--- | :--- | :--- |
-| **Service / Module** | `service["API Service"]` | `["..."]` | Core services, packages, HTTP handlers, controllers |
-| **User / Consumer** | `user(("Web Browser"))` | `(("..."))` | Terminal developers, human users, external clients |
-| **Decision / Gateway** | `auth{"Auth Gate"}` | `{"..."}` | Routers, API gateways, decision points, evaluators |
-| **Worker / Queue** | `worker>"Worker Queue"]` | `nodeID>"..."]` | Background jobs, queue consumers, async event handlers |
-| **Database / Store** | `db[("Main Database")]` | `[("...")]` | Persistent databases, file systems, disk caches |
+| **Service / Module** | `service: "API Service" { shape: rectangle }` | `rectangle` | Core services, packages, HTTP handlers, controllers |
+| **User / Consumer** | `user: "Web Browser" { shape: circle }` | `circle` | Terminal developers, human users, external clients |
+| **Decision / Gateway** | `auth: "Auth Gate" { shape: diamond }` | `diamond` | Routers, API gateways, decision points, evaluators |
+| **Worker / Queue** | `worker: "Worker Queue" { shape: queue }` | `queue` | Background jobs, queue consumers, async event handlers |
+| **Database / Store** | `db: "Main Database" { shape: cylinder }` | `cylinder` | Persistent databases, file systems, disk caches |
+| **Event Watcher** | `watcher: "File Watcher" { shape: hexagon }` | `hexagon` | File watchers, monitors, triggers |
 
-*(Comment actionable variable: To change a component's rendered geometry, switch the delimiter pair, e.g. change `["..."]` to `[("...")]` to convert a module into a database).*
+*(Note: D2 does NOT support `shape: triangle` for nodes—triangle is reserved for arrowheads).*
 
 ---
 
-## 5. Palette Color Classes
-Sage visualizer comes pre-calibrated with 7 dark-slate architectural color classes. Attach color styling to any node using the `:::<color>` class tag:
+## 5. Palette Color Styling
+Sage visualizer comes pre-calibrated with 7 dark-slate architectural color classes. Attach color styling to any node using `style.fill` and `style.stroke`:
 
-- `:::blue` - Core services, application packages, and controllers.
-- `:::green` - Entrypoints, human users, clients, and healthy interfaces.
-- `:::yellow` - Decision gates, auth verifiers, and command dispatchers.
-- `:::purple` - Persistent storage, databases, and graph AST models.
-- `:::orange` - Background workers, file watchers, and asynchronous queue consumers.
-- `:::red` - External untrusted APIs, error boundaries, and monitor alerts.
-- `:::gray` - Shared utilities, helper libraries, and neutral fallback modules.
+- **Blue** (`fill: "#1e3a8a"`, `stroke: "#60a5fa"`) - Core services, application packages, and controllers.
+- **Green** (`fill: "#14532d"`, `stroke: "#4ade80"`) - Entrypoints, human users, clients, and healthy interfaces.
+- **Yellow** (`fill: "#713f12"`, `stroke: "#facc15"`) - Decision gates, auth verifiers, and command dispatchers.
+- **Purple** (`fill: "#581c87"`, `stroke: "#c084fc"`) - Persistent storage, databases, and graph AST models.
+- **Orange** (`fill: "#7c2d12"`, `stroke: "#fb923c"`) - Background workers, file watchers, and asynchronous queue consumers.
+- **Red** (`fill: "#7f1d1d"`, `stroke: "#f87171"`) - External untrusted APIs, error boundaries, and monitor alerts.
+- **Gray** (`fill: "#334155"`, `stroke: "#94a3b8"`) - Shared utilities, helper libraries, and neutral fallback modules.
 
-### Optional classDef Declarations
-The Sage Sketchify engine automatically provides hand-drawn fills and borders for these classes. You may include standard class definitions at the bottom of the diagram for standard Mermaid previewers:
+### Example Node with Styling
 
-```mermaid
-flowchart LR
-    %% CHANGE CLASS TAG: Change ":::blue" to ":::green" or another palette class to switch theme color
-    app["Application Service"]:::blue
-    db[("Primary DB")]:::purple
-    app --> db
-
-    %% Color definitions matching dark slate theme variables
-    classDef blue fill:#1e3a8a,stroke:#60a5fa,color:#dbeafe
-    classDef green fill:#14532d,stroke:#4ade80,color:#dcfce7
-    classDef red fill:#7f1d1d,stroke:#f87171,color:#fee2e2
-    classDef yellow fill:#713f12,stroke:#facc15,color:#fef9c3
-    classDef purple fill:#581c87,stroke:#c084fc,color:#f3e8ff
-    classDef orange fill:#7c2d12,stroke:#fb923c,color:#ffedd5
-    classDef gray fill:#334155,stroke:#94a3b8,color:#f1f5f9
+```d2
+app: "Application Service" {
+  shape: rectangle
+  style.fill: "#1e3a8a"
+  style.stroke: "#60a5fa"
+}
 ```
 
 ---
 
 ## 6. Dependency Arrows & Connections
-Connect components with explicit dependency edges and clear action descriptions:
+Connect components with explicit dependency edges and clear action descriptions. Use container-scoped identifiers (`container.node`) when referencing elements across containers:
 
 - **Directed Call / Dependency**:
-  `source --> target` or `source -->|"Action / Protocol"| target`
+  `cli.user -> cli.main: "Runs CLI command"`
+- **Cross-container Call**:
+  `cli.router -> server.http_srv: "Starts local server"`
 - **Bidirectional Synchronization**:
-  `source <--> target` or `source <-->|"Two-way Sync / Stream"| target`
-- **Asynchronous / Weak Reference**:
-  `source -.-> target` or `source -.->|"PubSub Event"| target`
-
-*(Comment actionable variable: Switch arrow head from `-->` to `<-->` to represent two-way streaming or bidirectional communication instead of one-way request/response).*
+  `server.http_srv <-> server.watcher: "Live sync stream"`
 
 ---
 
@@ -110,42 +102,61 @@ When modifying or updating an existing architecture diagram:
 1. **Never wipe or regenerate the entire file**: AI models must respect established diagrams and perform minimal, surgical diffs.
 2. **Localize changes**:
    - Run `git status` and `git diff` to identify touched modules.
-   - Find the existing `subgraph` corresponding to the touched codebase path.
+   - Find the existing container corresponding to the touched codebase path.
    - Surgically add or update only the affected nodes and connection arrows.
-3. **Preserve surrounding context**: Retain existing nodes, connections, and subgraph layouts for untouched modules.
+3. **Preserve surrounding context**: Retain existing nodes, connections, and container layouts for untouched modules.
 4. **Explain simply**: Write component labels and edge descriptions as if teaching a child—straightforward, concise, and focused on structure.
 
 ---
 
 ## 8. Complete Working Example
 
-```mermaid
-flowchart LR
-    %% DIRECTION: Use "flowchart LR" (horizontal) or "flowchart TD" (top-down)
+```d2
+direction: right
 
-    %% SUBGRAPHS: Cluster nodes by codebase directory
-    subgraph CLI ["CLI Layer (cmd/sage)"]
-        %% SHAPES & COLORS: Change delimiter or class to alter shape and accent color
-        user(("Developer User")):::green
-        cli["Cobra CLI"]:::blue
-        router{"Command Router"}:::yellow
-    end
+cli: "CLI Layer (cmd/sage)" {
+  user: "Developer User" {
+    shape: circle
+    style.fill: "#14532d"
+    style.stroke: "#4ade80"
+  }
+  app: "Cobra CLI" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  router: "Command Router" {
+    shape: diamond
+    style.fill: "#713f12"
+    style.stroke: "#facc15"
+  }
+}
 
-    subgraph Server ["Web Server (internal/ui)"]
-        http_srv["HTTP Server"]:::blue
-        watcher>"File Watcher"]:::orange
-    end
+server: "Web Server (internal/ui)" {
+  http_srv: "HTTP Server" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  watcher: "File Watcher" {
+    shape: hexagon
+    style.fill: "#7c2d12"
+    style.stroke: "#fb923c"
+  }
+}
 
-    subgraph Engine ["DSL Engine (internal/parser)"]
-        parser["Mermaid Parser"]:::blue
-        ast[("AST Store")]:::purple
-    end
+engine: "D2 Engine (internal/d2)" {
+  compiler: "D2 Compiler" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+}
 
-    %% CONNECTIONS: Change arrow type or label to indicate communication protocol
-    user -->|"Runs CLI command"| cli
-    cli --> router
-    router -->|"Starts local server"| http_srv
-    http_srv -->|"Parses SAGE.md"| parser
-    parser --> ast
-    watcher -.->|"Triggers SSE reload"| http_srv
+# Connections
+cli.user -> cli.app: "Runs CLI command"
+cli.app -> cli.router: "Dispatches"
+cli.router -> server.http_srv: "Starts local server"
+server.http_srv -> engine.compiler: "Parses SAGE.md"
+server.watcher -> server.http_srv: "Triggers SSE reload"
 ```

@@ -14,7 +14,8 @@ dist/
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 build.sh
 extras/  
 docs/agents
@@ -22,6 +23,7 @@ docs/agents
 info.md
 prompt.txt
 PLAN.md
+ui-old/
 # SQLite temp files
 *.db-wal
 *.db-shm

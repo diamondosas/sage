@@ -14,31 +14,46 @@ Map codebase architecture into `SAGE.md` so human users can visually inspect str
 3. **Reference documentation**: See [references/language-syntax.md](references/language-syntax.md) for full syntax, shapes, and color rules.
 
 ## SAGE.md Syntax Quick Reference
-Architecture maps in `SAGE.md` are specified using standard Mermaid `flowchart LR` (or `flowchart TD`) code blocks:
+Architecture maps in `SAGE.md` are specified using standard D2 code blocks:
 
-```mermaid
-flowchart LR
-    %% Subgraphs cluster nodes into architectural domains and codebase directories
-    %% CHANGE DIRECTION: Use "flowchart TD" for vertical or "flowchart LR" for horizontal flow
-    subgraph CLI ["CLI Entrypoint (cmd/sage)"]
-        %% CHANGE SHAPES: (("circle")) client, ["rect"] service, {"diamond"} gateway/router
-        %% CHANGE COLORS: :::blue, :::green, :::yellow, :::purple, :::orange, :::red, :::gray
-        user(("Terminal User")):::green
-        cli["Cobra CLI"]:::blue
-        gate{"Decision Gate"}:::yellow
-    end
+```d2
+direction: right
 
-    subgraph Storage ["Data Layer (internal/storage)"]
-        %% CHANGE SHAPES: id[("cylinder")] database/storage, id>"banner"] worker/queue
-        db[("Database Store")]:::purple
-        worker>"Task Worker"]:::orange
-    end
+cli: "CLI Layer (cmd/sage)" {
+  user: "Terminal User" {
+    shape: circle
+    style.fill: "#14532d"
+    style.stroke: "#4ade80"
+  }
+  app: "Cobra CLI" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  gate: "Decision Gate" {
+    shape: diamond
+    style.fill: "#713f12"
+    style.stroke: "#facc15"
+  }
+}
 
-    %% CHANGE ARROWS: --> (directed), <--> (bidirectional), -.-> (async/events)
-    user --> cli
-    cli --> gate
-    gate -->|"Dispatches query"| db
-    gate <-->|"Bidirectional stream"| worker
+storage: "Storage Layer (internal/storage)" {
+  db: "Database Store" {
+    shape: cylinder
+    style.fill: "#581c87"
+    style.stroke: "#c084fc"
+  }
+  worker: "Task Worker" {
+    shape: queue
+    style.fill: "#7c2d12"
+    style.stroke: "#fb923c"
+  }
+}
+
+cli.user -> cli.app
+cli.app -> cli.gate
+cli.gate -> storage.db: "Dispatches query"
+cli.gate <-> storage.worker: "Bidirectional stream"
 ```
 
 ## Incremental Update Protocol

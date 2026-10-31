@@ -1,45 +1,31 @@
 /**
  * Sage Architecture Visualizer - Pan and Zoom Controller
- *
  * Provides smooth canvas panning by dragging, mouse wheel zooming with bounded
  * scaling limits, reset coordinates, and toolbar button bindings.
  */
 
 // =============================================================================
 // PAN & ZOOM CONFIGURATION
+// ACTIONABLE: Adjust minScale, maxScale, or zoom step factors here.
 // =============================================================================
 const DEFAULT_VIEW_CONFIG = {
   x: 0,
   y: 0,
   scale: 1,
   minScale: 0.15,
-  maxScale: 3.0,
+  maxScale: 3.5,
   zoomInFactor: 1.2,
   zoomOutFactor: 0.8
 };
 
-/**
- * Creates a fresh view state initialized with defaults or overrides.
- */
 function createViewState(overrides = {}) {
   return Object.assign({}, DEFAULT_VIEW_CONFIG, overrides);
 }
 
-/**
- * Clamps scale value strictly between minScale and maxScale.
- */
-function clampScale(scale, minScale = 0.15, maxScale = 3.0) {
+function clampScale(scale, minScale = 0.15, maxScale = 3.5) {
   return Math.min(maxScale, Math.max(minScale, scale));
 }
 
-/**
- * Calculates updated viewState after applying a zoom factor.
- *
- * @param {Object} currentViewState - Current x, y, scale, minScale, maxScale.
- * @param {number} factor - Multiplier (e.g., 1.2 or 0.8).
- * @param {Object} [focalPoint] - Optional { clientX, clientY } anchor.
- * @param {Object} [stageBounds] - Optional { left, top, width, height } bounding rect.
- */
 function calculateZoom(currentViewState, factor, focalPoint, stageBounds) {
   const oldScale = currentViewState.scale;
   const newScale = clampScale(oldScale * factor, currentViewState.minScale, currentViewState.maxScale);
@@ -69,9 +55,6 @@ function calculateZoom(currentViewState, factor, focalPoint, stageBounds) {
   });
 }
 
-/**
- * Calculates updated viewState after panning by (dx, dy).
- */
 function calculatePan(currentViewState, dx, dy) {
   return Object.assign({}, currentViewState, {
     x: currentViewState.x + dx,
@@ -79,9 +62,6 @@ function calculatePan(currentViewState, dx, dy) {
   });
 }
 
-/**
- * Resets viewState back to origin (x: 0, y: 0, scale: 1).
- */
 function calculateReset(currentViewState) {
   return Object.assign({}, currentViewState, {
     x: 0,
@@ -90,28 +70,15 @@ function calculateReset(currentViewState) {
   });
 }
 
-/**
- * Formats viewState into standard SVG transform attribute string.
- */
 function getTransformString(viewState) {
   return `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`;
 }
 
-/**
- * Applies transform string directly to target SVG element.
- */
 function applyTransform(targetElement, viewState) {
   if (!targetElement) return;
   targetElement.setAttribute('transform', getTransformString(viewState));
 }
 
-/**
- * Attaches interactive pan and zoom event listeners to an SVG canvas and viewport.
- *
- * @param {SVGSVGElement} svg - The SVG container element.
- * @param {SVGElement} viewport - The <g> element wrapping transformed content.
- * @param {Object} [options] - Optional custom handlers and initial state.
- */
 function initPanZoom(svg, viewport, options = {}) {
   if (!svg || !viewport) return null;
 
@@ -130,7 +97,6 @@ function initPanZoom(svg, viewport, options = {}) {
     onTransform(state);
   }
 
-  // Initial transform application
   update();
 
   function onMouseDown(e) {
@@ -179,7 +145,6 @@ function initPanZoom(svg, viewport, options = {}) {
   window.addEventListener('mouseup', onMouseUp);
   svg.addEventListener('wheel', onWheel, { passive: false });
 
-  // Bind toolbar action buttons if explicitly provided in options
   const btnZoomIn = options.btnZoomIn || null;
   const btnZoomOut = options.btnZoomOut || null;
   const btnResetView = options.btnResetView || null;

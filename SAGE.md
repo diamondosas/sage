@@ -1,62 +1,124 @@
 # SAGE Architecture Map
 
-```sage
-// group: CLI Entrypoint
-// path: cmd/sage
-circle user "Terminal Developer" [green]
-rect main "Main Entrypoint (main.go)" [blue]
-diamond cli_root "Cobra Command Dispatcher" [yellow]
-rect cmd_init "Init Command (init.go)" [blue]
-rect cmd_ui "UI Command & Workflow (ui.go)" [blue]
+```d2
+direction: right
 
-// group: Web Visualizer Server
-// path: internal/ui
-rect ui_server "HTTP Server & Router (server.go)" [blue]
-triangle sse_watcher "File Watcher & SSE Live Reload" [orange]
+cli: "CLI Entrypoint (cmd/sage)" {
+  user: "Terminal Developer" {
+    shape: circle
+    style.fill: "#14532d"
+    style.stroke: "#4ade80"
+  }
+  main: "Main Entrypoint (main.go)" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  cli_root: "Cobra Command Dispatcher" {
+    shape: diamond
+    style.fill: "#713f12"
+    style.stroke: "#facc15"
+  }
+  cmd_init: "Init Command (init.go)" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  cmd_ui: "UI Command & Workflow (ui.go)" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+}
 
-// group: DSL Engine
-// path: internal/parser
-rect dsl_parser "DSL Parser (parser.go)" [blue]
-cylinder graph_ast "Graph AST & Types (types.go)" [purple]
+server: "Web Visualizer Server (internal/ui)" {
+  ui_server: "HTTP Server & Router (server.go)" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  sse_watcher: "File Watcher & SSE Live Reload" {
+    shape: hexagon
+    style.fill: "#7c2d12"
+    style.stroke: "#fb923c"
+  }
+}
 
-// group: Frontend & Canvas
-// path: ui
-circle browser "Web Browser Client" [green]
-rect embedded_assets "Embedded FS & HTML Template" [blue]
-rect canvas_app "Canvas Renderer (Rough.js & Dagre)" [yellow]
+d2_engine: "D2 Engine (internal/d2)" {
+  d2_compiler: "D2 Compiler (d2.go)" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  d2_svg: "D2 SVG Renderer" {
+    shape: cylinder
+    style.fill: "#581c87"
+    style.stroke: "#c084fc"
+  }
+}
 
-// group: Architecture Data
-// path: SAGE.md
-cylinder sage_file "SAGE.md Spec" [purple]
+frontend: "Frontend & Canvas (ui)" {
+  browser: "Web Browser Client" {
+    shape: circle
+    style.fill: "#14532d"
+    style.stroke: "#4ade80"
+  }
+  embedded_assets: "Embedded FS & HTML Template" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  panzoom: "SVG Pan & Zoom (panzoom.tpl)" {
+    shape: rectangle
+    style.fill: "#334155"
+    style.stroke: "#94a3b8"
+  }
+}
 
-// group: Skills & Distribution
-// path: skills/sage
-rect agent_skill "Agent Skill & Syntax Spec" [gray]
-rect installer "Installer Script (assets/install.sh)" [gray]
+storage: "Architecture Data (SAGE.md)" {
+  sage_file: "SAGE.md Spec" {
+    shape: cylinder
+    style.fill: "#581c87"
+    style.stroke: "#c084fc"
+  }
+}
 
-// Connections: Execution & CLI
-user -> main "Runs 'sage' in terminal"
-main -> cli_root "cli.Execute()"
-cli_root -> cmd_init "Dispatches 'sage init'"
-cli_root -> cmd_ui "Dispatches default / 'sage ui'"
-cmd_init -> sage_file "Creates starter template"
+distribution: "Skills & Distribution (skills/sage)" {
+  agent_skill: "Agent Skill & Syntax Spec" {
+    shape: rectangle
+    style.fill: "#334155"
+    style.stroke: "#94a3b8"
+  }
+  installer: "Installer Script (assets/install.sh)" {
+    shape: rectangle
+    style.fill: "#334155"
+    style.stroke: "#94a3b8"
+  }
+}
 
-// Connections: Web Server & Browser
-cmd_ui -> ui_server "Starts HTTP server"
-cmd_ui -> browser "Launches web browser"
-browser -> ui_server "Requests UI & /api/graph"
-browser <-> sse_watcher "EventSource stream /api/events"
-browser -> canvas_app "Renders interactive diagram"
+# Connections: Execution & CLI
+cli.user -> cli.main: "Runs 'sage' in terminal"
+cli.main -> cli.cli_root: "cli.Execute()"
+cli.cli_root -> cli.cmd_init: "Dispatches 'sage init'"
+cli.cli_root -> cli.cmd_ui: "Dispatches default / 'sage ui'"
+cli.cmd_init -> storage.sage_file: "Creates starter template"
 
-// Connections: Parsing & Templates
-ui_server -> embedded_assets "Serves base.tpl & static assets"
-ui_server -> dsl_parser "Invokes ParseFile()"
-dsl_parser -> sage_file "Reads DSL statements"
-dsl_parser -> graph_ast "Generates Nodes, Edges, & Warnings"
-ui_server -> browser "Transmits Graph JSON"
+# Connections: Web Server & Browser
+cli.cmd_ui -> server.ui_server: "Starts HTTP server"
+cli.cmd_ui -> frontend.browser: "Launches web browser"
+frontend.browser -> server.ui_server: "Requests UI & /api/diagram"
+frontend.browser <-> server.sse_watcher: "EventSource stream /api/events"
+frontend.browser -> frontend.panzoom: "Panning and zooming SVG"
 
-// Connections: File Watcher & Distribution
-sse_watcher -> sage_file "Polls os.Stat() mod time"
-agent_skill -> sage_file "Maintains DSL architecture"
-installer -> user "Installs binary & agent skills"
+# Connections: Parsing & Templates
+server.ui_server -> frontend.embedded_assets: "Serves base.tpl & static assets"
+server.ui_server -> d2_engine.d2_compiler: "Invokes ParseFile()"
+d2_engine.d2_compiler -> storage.sage_file: "Reads D2 statements"
+d2_engine.d2_compiler -> d2_engine.d2_svg: "Generates SVG with Dagre layout"
+server.ui_server -> frontend.browser: "Transmits inlined D2 SVG"
+
+# Connections: File Watcher & Distribution
+server.sse_watcher -> storage.sage_file: "Polls os.Stat() mod time"
+distribution.agent_skill -> storage.sage_file: "Maintains D2 architecture"
+distribution.installer -> cli.user: "Installs binary & agent skills"
 ```

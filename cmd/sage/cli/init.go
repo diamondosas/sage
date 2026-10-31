@@ -7,30 +7,43 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// StarterTemplate defines the initial SAGE.md architecture diagram skeleton.
+// StarterTemplate defines the initial SAGE.md architecture diagram skeleton in D2 syntax.
 // ACTIONABLE: Customize this template string to change the default starter diagram,
 // default shapes, or domain clusters created for new repositories.
 const StarterTemplate = `// SAGE Architecture Diagram
-// AI Agent Mission: Map codebase architecture here so humans can inspect it in the web visualizer.
-// The AI agent must never assume anything: verify facts via git diff and file inspections.
+# AI Agent Mission: Map codebase architecture here so humans can inspect it in the web visualizer.
+direction: right
 
-// group: Web Interface
-// path: ui/
-circle user "Browser Client" [green]
+cli: "CLI Layer (cmd/sage)" {
+  user: "Browser Client" {
+    shape: circle
+    style.fill: "#14532d"
+    style.stroke: "#4ade80"
+  }
+  app: "Cobra CLI" {
+    shape: rectangle
+    style.fill: "#1e3a8a"
+    style.stroke: "#60a5fa"
+  }
+  router: "Command Router" {
+    shape: diamond
+    style.fill: "#713f12"
+    style.stroke: "#facc15"
+  }
+}
 
-// group: CLI & Service
-// path: cmd/sage
-rect cli "Cobra CLI" [blue]
-diamond router "Command Router" [yellow]
+storage: "Storage Layer (internal/d2)" {
+  db: "Database Store" {
+    shape: cylinder
+    style.fill: "#581c87"
+    style.stroke: "#c084fc"
+  }
+}
 
-// group: Storage
-// path: internal/graph
-cylinder db "Database Store" [purple]
-
-// Connections
-user -> cli "Runs 'sage' in terminal"
-cli -> router "Dispatches action"
-router -> db "Reads/writes state"
+# Connections
+cli.user -> cli.app: "Runs 'sage' in terminal"
+cli.app -> cli.router: "Dispatches action"
+cli.router -> storage.db: "Reads/writes state"
 `
 
 // DefaultDiagramFile is the default filename used for architecture diagrams.

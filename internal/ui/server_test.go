@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"sage/internal/parser"
+	"sage/internal/d2"
 	internalui "sage/internal/ui"
 )
 
@@ -26,11 +26,12 @@ func setupTestDiagram(t *testing.T, content string) string {
 	return filePath
 }
 
-func TestServer_APIGraph(t *testing.T) {
+func TestServer_APIDiagram(t *testing.T) {
 	content := `
-rect auth "Auth Service" [blue]
-rect api "API Gateway" [green]
-api -> auth "validates token"
+direction: right
+api: API Gateway
+auth: Auth Service
+api -> auth: validates token
 `
 	filePath := setupTestDiagram(t, content)
 	server := internalui.NewServer(internalui.Config{
@@ -38,7 +39,7 @@ api -> auth "validates token"
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/diagram", nil)
 	server.Handler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -50,31 +51,21 @@ api -> auth "validates token"
 		t.Fatalf("expected application/json, got %s", contentType)
 	}
 
-	var graph parser.Graph
-	if err := json.NewDecoder(rec.Body).Decode(&graph); err != nil {
+	var res d2.Result
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
 		t.Fatalf("failed to decode json response: %v", err)
 	}
 
-	if len(graph.Nodes) != 2 {
-		t.Fatalf("expected 2 nodes, got %d", len(graph.Nodes))
+	if !strings.Contains(res.SVG, "<svg") {
+		t.Fatalf("expected SVG in response, got: %s", res.SVG)
 	}
-	if len(graph.Edges) != 1 {
-		t.Fatalf("expected 1 edge, got %d", len(graph.Edges))
-	}
-	if graph.Nodes[0].ID != "auth" || graph.Nodes[1].ID != "api" {
-		t.Fatalf("unexpected nodes: %+v", graph.Nodes)
-	}
-	if graph.Edges[0].From != "api" || graph.Edges[0].To != "auth" {
-		t.Fatalf("unexpected edges: %+v", graph.Edges)
+	if !strings.Contains(res.SVG, "API Gateway") {
+		t.Fatalf("expected SVG to contain 'API Gateway'")
 	}
 }
 
-// TestServer_APIGraph_MermaidContent verifies that raw Mermaid markup within markdown
-// code blocks is cleanly parsed and served via the /api/graph endpoint.
-// TWEAK HERE: Modify the Mermaid flowchart snippet below to test alternative diagram
-// structures, custom subgraphs, or different directional flows (e.g., flowchart TD).
-func TestServer_APIGraph_MermaidContent(t *testing.T) {
-	content := "# Architecture\n\n```mermaid\nflowchart LR\n    api[API Gateway] --> auth[Auth Service]\n```"
+func TestServer_APIGraph_BackwardCompatibility(t *testing.T) {
+	content := "```d2\na -> b: connects\n```"
 	filePath := setupTestDiagram(t, content)
 	server := internalui.NewServer(internalui.Config{
 		FilePath: filePath,
@@ -88,18 +79,18 @@ func TestServer_APIGraph_MermaidContent(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var graph parser.Graph
-	if err := json.NewDecoder(rec.Body).Decode(&graph); err != nil {
+	var res d2.Result
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
 		t.Fatalf("failed to decode json response: %v", err)
 	}
 
-	if !strings.Contains(graph.Mermaid, "flowchart LR") || !strings.Contains(graph.Mermaid, "api[API Gateway]") {
-		t.Fatalf("expected graph.Mermaid to contain flowchart markup, got %q", graph.Mermaid)
+	if !strings.Contains(res.SVG, "<svg") {
+		t.Fatalf("expected SVG in response, got: %s", res.SVG)
 	}
 }
 
 func TestServer_Index(t *testing.T) {
-	content := `rect core "Core Service" [yellow]`
+	content := `core: Core Service { shape: rectangle }`
 	filePath := setupTestDiagram(t, content)
 	server := internalui.NewServer(internalui.Config{
 		FilePath: filePath,
@@ -114,11 +105,11 @@ func TestServer_Index(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "sage-canvas") {
-		t.Errorf("expected HTML to contain sage-canvas element, got:\n%s", body)
+	if !strings.Contains(body, "diagram-stage") {
+		t.Errorf("expected HTML to contain diagram-stage, got:\n%s", body)
 	}
-	if !strings.Contains(body, "Core Service") && !strings.Contains(body, "core") {
-		t.Errorf("expected HTML to contain diagram data, got:\n%s", body)
+	if !strings.Contains(body, "Core Service") {
+		t.Errorf("expected HTML to contain 'Core Service', got:\n%s", body)
 	}
 }
 
@@ -130,15 +121,9 @@ func TestServer_StaticAssets(t *testing.T) {
 
 	staticPaths := []string{
 		"/static/css/tailwind.min.css",
-		"/static/js/libs/rough.js",
-		"/static/js/libs/dagre.min.js",
-		"/static/js/libs/mermaid.min.js",
-		"/static/js/sketchify.js",
-		"/static/js/panzoom.js",
-		"/static/js/annotations.js",
-		"/static/js/export.js",
 		"/static/fonts/Caveat-Regular.ttf",
-		"/static/js/app.js",
+		"/static/js/panzoom.tpl",
+		"/static/js/app.tpl",
 	}
 
 	for _, path := range staticPaths {
@@ -158,8 +143,7 @@ func TestServer_StaticAssets(t *testing.T) {
 }
 
 func TestServer_SSE_LiveReload(t *testing.T) {
-	filePath := setupTestDiagram(t, `rect init "Initial Node"`)
-	// Use small watch ticker for fast test execution
+	filePath := setupTestDiagram(t, `init: Initial Node`)
 	server := internalui.NewServer(internalui.Config{
 		FilePath:      filePath,
 		CheckInterval: 50 * time.Millisecond,
@@ -189,7 +173,7 @@ func TestServer_SSE_LiveReload(t *testing.T) {
 
 	// Trigger file update by modifying the file
 	time.Sleep(75 * time.Millisecond)
-	newContent := `rect init "Initial Node"` + "\n" + `circle new "New Node"`
+	newContent := "init: Initial Node\nnew: New Node\ninit -> new"
 	if err := os.WriteFile(filePath, []byte(newContent), 0644); err != nil {
 		t.Fatalf("failed to update test diagram: %v", err)
 	}
@@ -227,20 +211,19 @@ func TestServer_NonExistentFile(t *testing.T) {
 		FilePath: "/path/to/nonexistent/SAGE.md",
 	})
 
-	// /api/graph should return 200 with warnings
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/diagram", nil)
 	server.Handler().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var g parser.Graph
-	if err := json.NewDecoder(rec.Body).Decode(&g); err != nil {
-		t.Fatalf("failed to decode graph: %v", err)
+	var res d2.Result
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
 	}
-	if len(g.Warnings) == 0 {
+	if len(res.Warnings) == 0 {
 		t.Errorf("expected warning for missing file")
 	}
 
@@ -263,4 +246,3 @@ func TestServer_NotFound(t *testing.T) {
 		t.Fatalf("expected 404 for unknown path, got %d", rec.Code)
 	}
 }
-
