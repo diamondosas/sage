@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # CHANGE HERE: Add more OS runners or architectures if needed
+        # CHANGE HERE: Add more OS runners or architectures if needed (e.g., [ubuntu-latest, macos-latest, windows-latest])
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
@@ -24,6 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
+          # CHANGE HERE: Point to a specific Go version string (e.g. '1.23') instead of go-version-file if desired
           go-version-file: 'go.mod'
           cache: true
 

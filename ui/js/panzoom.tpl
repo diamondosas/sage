@@ -76,6 +76,11 @@ function getTransformString(viewState) {
 
 function applyTransform(targetElement, viewState) {
   if (!targetElement) return;
+  // GPU-accelerated CSS translate3d + scale for silky-smooth 60/120fps panning and zooming without layout thrashing
+  // CHANGE HERE: Adjust transform-origin or style properties if specific composite layering is needed
+  targetElement.style.transformOrigin = '0 0';
+  targetElement.style.willChange = 'transform';
+  targetElement.style.transform = `translate3d(${viewState.x}px, ${viewState.y}px, 0) scale(${viewState.scale})`;
   targetElement.setAttribute('transform', getTransformString(viewState));
 }
 
@@ -89,10 +94,25 @@ function initPanZoom(svg, viewport, options = {}) {
   let startX = 0;
   let startY = 0;
   let hasMoved = false;
+  let rafId = null;
 
   const onTransform = options.onTransform || (() => {});
 
+  // Schedules DOM update on next browser animation frame (vsync-aligned 60/120fps)
+  function scheduleUpdate() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      applyTransform(viewport, state);
+      onTransform(state);
+    });
+  }
+
   function update() {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     applyTransform(viewport, state);
     onTransform(state);
   }
@@ -122,7 +142,7 @@ function initPanZoom(svg, viewport, options = {}) {
 
     state.x = e.clientX - startX;
     state.y = e.clientY - startY;
-    update();
+    scheduleUpdate();
   }
 
   function onMouseUp() {
@@ -137,7 +157,7 @@ function initPanZoom(svg, viewport, options = {}) {
     const factor = e.deltaY < 0 ? (options.zoomInFactor || 1.1) : (options.zoomOutFactor || 0.9);
     const rect = svg.getBoundingClientRect();
     state = calculateZoom(state, factor, { clientX: e.clientX, clientY: e.clientY }, rect);
-    update();
+    scheduleUpdate();
   }
 
   svg.addEventListener('mousedown', onMouseDown);
@@ -185,6 +205,10 @@ function initPanZoom(svg, viewport, options = {}) {
     resetView: resetHandler,
     hasMovedDuringDrag: () => hasMoved,
     destroy: () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       svg.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);

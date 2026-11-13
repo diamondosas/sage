@@ -128,6 +128,7 @@
 
       <div class="flex items-center space-x-1 pl-3" style="border-left: 1px solid var(--line);">
         <button id="btn-theme-toggle" title="Toggle Dark/Light Mode" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">🌓 Theme</button>
+        <button id="btn-sketch-toggle" title="Toggle Sketch / Crisp lines" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">✏️ Sketch (Off)</button>
         <button id="btn-zoom-in" title="Zoom In (+)" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Zoom In</button>
         <button id="btn-zoom-out" title="Zoom Out (-)" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Zoom Out</button>
         <button id="btn-reset-view" title="Reset View (⟲)" class="btn-action px-2 py-1 text-xs rounded transition-opacity hover:opacity-80">Reset View</button>

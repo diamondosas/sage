@@ -25,15 +25,57 @@
   const getEl = id => document.getElementById(id);
 
   /**
-   * Wraps top-level diagram elements in a dedicated <g id="viewport"> for pan/zoom.
+   * Unwraps any nested D2 <svg><svg ...> wrapper and packages top-level shapes into a dedicated <g id="viewport">.
+   * Flattens the DOM into a single clean root <svg>, eliminates viewport clipping, and enables GPU-accelerated transforms.
    */
   function wrapInViewport(svgEl) {
     if (!svgEl) return null;
     let vp = svgEl.querySelector('#viewport');
     if (vp) return vp;
 
+    // Detect if D2 rendered an inner <svg> element
+    const innerSvg = svgEl.querySelector('svg');
+    if (innerSvg && innerSvg !== svgEl) {
+      // Adopt viewBox from inner SVG containing diagram bounds and padding
+      const innerViewBox = innerSvg.getAttribute('viewBox');
+      if (innerViewBox) {
+        svgEl.setAttribute('viewBox', innerViewBox);
+      }
+
+      // Merge diagram classes
+      const innerClass = innerSvg.getAttribute('class');
+      if (innerClass) {
+        svgEl.setAttribute('class', ((svgEl.getAttribute('class') || '') + ' ' + innerClass).trim());
+      }
+
+      // Create single viewport group for hardware-accelerated transforms
+      vp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      vp.setAttribute('id', 'viewport');
+      vp.style.transformOrigin = '0 0';
+      vp.style.willChange = 'transform';
+
+      // Move children from innerSvg into svgEl (defs/style) or vp (shapes/paths)
+      while (innerSvg.firstChild) {
+        const child = innerSvg.firstChild;
+        const tag = (child.tagName || '').toLowerCase();
+        if (tag === 'defs' || tag === 'style') {
+          svgEl.insertBefore(child, innerSvg);
+        } else {
+          vp.appendChild(child);
+        }
+      }
+
+      // Remove the redundant inner <svg> wrapper completely
+      innerSvg.remove();
+      svgEl.appendChild(vp);
+      return vp;
+    }
+
+    // Standard wrap if no inner <svg> exists
     vp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     vp.setAttribute('id', 'viewport');
+    vp.style.transformOrigin = '0 0';
+    vp.style.willChange = 'transform';
 
     const children = Array.from(svgEl.childNodes);
     children.forEach(child => {
@@ -59,6 +101,7 @@
       const stage = document.getElementById('diagram-stage');
       const stageW = (stage && stage.clientWidth) || window.innerWidth || 1280;
       const stageH = (stage && stage.clientHeight) || window.innerHeight || 800;
+      // CHANGE HERE: Adjust padding around diagram during auto-fit
       const padding = 48;
 
       const scaleX = (stageW - 2 * padding) / bbox.width;
@@ -79,7 +122,14 @@
       if (activePanZoom) {
         activePanZoom.setState(viewState);
       } else {
-        viewportEl.setAttribute('transform', `translate(${x}, ${y}) scale(${scale})`);
+        if (window.PanZoom && window.PanZoom.applyTransform) {
+          window.PanZoom.applyTransform(viewportEl, viewState);
+        } else {
+          viewportEl.style.transformOrigin = '0 0';
+          viewportEl.style.willChange = 'transform';
+          viewportEl.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+          viewportEl.setAttribute('transform', `translate(${x}, ${y}) scale(${scale})`);
+        }
       }
     } catch (e) {
       // getBBox might fail in rare headless configurations
@@ -123,7 +173,14 @@
     if (isInitial) {
       autoFitDiagram(svgEl, viewportEl);
     } else if (viewportEl) {
-      viewportEl.setAttribute('transform', `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`);
+      if (window.PanZoom && window.PanZoom.applyTransform) {
+        window.PanZoom.applyTransform(viewportEl, viewState);
+      } else {
+        viewportEl.style.transformOrigin = '0 0';
+        viewportEl.style.willChange = 'transform';
+        viewportEl.style.transform = `translate3d(${viewState.x}px, ${viewState.y}px, 0) scale(${viewState.scale})`;
+        viewportEl.setAttribute('transform', `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`);
+      }
     }
 
     setupClickHighlight(svgEl);
@@ -206,7 +263,7 @@
   }
 
   /**
-   * Export diagram as SVG file download.
+   * Export diagram as standalone clean SVG file download.
    */
   function exportSvg() {
     const stage = getEl('diagram-stage');
@@ -214,6 +271,14 @@
     if (!svgEl) return;
 
     const clone = svgEl.cloneNode(true);
+    // Ensure viewport in exported SVG has standard SVG transform attribute and clear GPU styles
+    const vp = clone.querySelector('#viewport');
+    if (vp) {
+      vp.style.transform = '';
+      vp.style.willChange = '';
+      vp.setAttribute('transform', `translate(${viewState.x}, ${viewState.y}) scale(${viewState.scale})`);
+    }
+
     const serializer = new XMLSerializer();
     const source = serializer.serializeToString(clone);
     const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
@@ -225,6 +290,24 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Sketch Mode Toggle (Crisp lines vs Hand-drawn sketch).
+   * Crisp lines offer maximum rendering performance and zero zoom lag.
+   */
+  let isSketch = false;
+
+  function setupSketchToggle() {
+    const btnSketch = getEl('btn-sketch-toggle');
+    if (!btnSketch) return;
+
+    btnSketch.addEventListener('click', () => {
+      isSketch = !isSketch;
+      btnSketch.textContent = isSketch ? '✏️ Sketch (On)' : '✏️ Sketch (Off)';
+      btnSketch.classList.toggle('opacity-70', !isSketch);
+      fetchDiagram();
+    });
   }
 
   /**
@@ -253,7 +336,8 @@
   }
 
   function fetchDiagram() {
-    fetch('/api/diagram')
+    const sketchParam = isSketch ? '?sketch=true' : '?sketch=false';
+    fetch('/api/diagram' + sketchParam)
       .then(res => res.json())
       .then(data => {
         if (!data) return;
@@ -299,6 +383,7 @@
   // =========================================================================
   function init() {
     setupTheme();
+    setupSketchToggle();
     setupDiagram(true);
     setupLiveReload();
 

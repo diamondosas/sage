@@ -3,6 +3,8 @@ package d2
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/d2lang/d2/d2lib"
 	"github.com/d2lang/d2/d2renderers/d2svg"
 	"github.com/d2lang/d2/d2themes/d2themescatalog"
+	d2log "github.com/d2lang/d2/lib/log"
 	"github.com/d2lang/d2/lib/textmeasure"
 	"github.com/d2lang/util-go/go2"
 )
@@ -18,13 +21,15 @@ import (
 // =========================================================================
 // ACTIONABLE CONFIGURATION VARIABLES
 // Tweak these variables to change default rendering behavior:
-// - DefaultSketch: set to false for crisp straight lines instead of hand-drawn look.
+// - DefaultSketch: set to false for crisp straight lines (fastest, smooth zoom), or true for hand-drawn look.
 // - DefaultThemeID: light theme ID (d2themescatalog.NeutralDefault = 0).
 // - DefaultDarkThemeID: dark theme ID (d2themescatalog.DarkMauve = 100).
 // - DefaultPadding: padding around diagram in pixels.
 // =========================================================================
+
+// CHANGE HERE: Set DefaultSketch = true if you prefer hand-drawn sketchy lines over crisp lines.
 const (
-	DefaultSketch  = true
+	DefaultSketch  = false
 	DefaultPadding = int64(24)
 )
 
@@ -118,6 +123,10 @@ func Compile(ctx context.Context, source string, opts *Options) (*Result, error)
 		DarkThemeID: go2.Pointer(darkThemeID),
 	}
 
+	// Inject slog logger into context to suppress D2's "missing slog.Logger in context" warning
+	// CHANGE HERE: Replace io.Discard with os.Stderr to enable D2 internal debug logging
+	ctx = d2log.With(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
 	// Compile D2 graph AST
 	diagram, _, err := d2lib.Compile(ctx, d2Source, compileOpts, renderOpts)
 	if err != nil {
@@ -136,9 +145,62 @@ func Compile(ctx context.Context, source string, opts *Options) (*Result, error)
 		}, nil
 	}
 
+	// Unnest D2 wrapper into a clean, single root <svg>
+	svgOutput := FlattenSVG(string(svgBytes))
+
 	return &Result{
-		SVG: string(svgBytes),
+		SVG: svgOutput,
 	}, nil
+}
+
+// FlattenSVG unwraps D2's nested <svg><svg ...> fitToScreen wrapper into a single clean root <svg>.
+// Eliminates redundant nested SVG viewports, prevents coordinate clipping, and solves zoom lag.
+// CHANGE HERE: Set return svgStr directly if nested SVG wrapper structure is ever preferred.
+func FlattenSVG(svgStr string) string {
+	outerStart := strings.Index(svgStr, "<svg ")
+	if outerStart == -1 {
+		return svgStr
+	}
+	innerStart := strings.Index(svgStr[outerStart+5:], "<svg ")
+	if innerStart == -1 {
+		return svgStr
+	}
+	innerStart += outerStart + 5
+
+	innerEnd := strings.Index(svgStr[innerStart:], ">")
+	if innerEnd == -1 {
+		return svgStr
+	}
+	innerEnd += innerStart
+
+	// Extract viewBox from inner <svg> which contains actual diagram bounds
+	innerTag := svgStr[innerStart : innerEnd+1]
+	vbIdx := strings.Index(innerTag, `viewBox="`)
+	if vbIdx == -1 {
+		return svgStr
+	}
+	vbEnd := strings.Index(innerTag[vbIdx+9:], `"`)
+	if vbEnd == -1 {
+		return svgStr
+	}
+	innerViewBox := innerTag[vbIdx+9 : vbIdx+9+vbEnd]
+
+	// Extract class from inner <svg>
+	classAttr := ""
+	if cIdx := strings.Index(innerTag, `class="`); cIdx != -1 {
+		if cEnd := strings.Index(innerTag[cIdx+7:], `"`); cEnd != -1 {
+			classAttr = fmt.Sprintf(` class="%s"`, innerTag[cIdx+7:cIdx+7+cEnd])
+		}
+	}
+
+	trimmed := strings.TrimRight(svgStr, " \t\r\n")
+	if !strings.HasSuffix(trimmed, "</svg></svg>") {
+		return svgStr
+	}
+
+	// Single root SVG with inner coordinates
+	content := svgStr[innerEnd+1 : len(trimmed)-6]
+	return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"%s viewBox="%s">%s`, classAttr, innerViewBox, content)
 }
 
 // ParseFile reads a diagram file from disk and compiles it into an SVG Result.

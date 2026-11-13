@@ -119,9 +119,24 @@ func (s *Server) routes() {
 	})
 }
 
+// parseSketchParam extracts optional sketch query parameter (?sketch=true / ?sketch=false).
+func parseSketchParam(r *http.Request) *bool {
+	val := r.URL.Query().Get("sketch")
+	if val == "" {
+		return nil
+	}
+	b := val == "true" || val == "1"
+	return &b
+}
+
 // loadDiagram reads the diagram file from disk and compiles it with D2.
-func (s *Server) loadDiagram() *d2.Result {
-	res, err := d2.ParseFile(s.filePath, nil)
+// ACTIONABLE: Pass opts with Sketch=true to force hand-drawn sketch mode.
+func (s *Server) loadDiagram(sketchOpt *bool) *d2.Result {
+	var opts *d2.Options
+	if sketchOpt != nil {
+		opts = &d2.Options{Sketch: sketchOpt}
+	}
+	res, err := d2.ParseFile(s.filePath, opts)
 	if err != nil {
 		return &d2.Result{
 			SVG:      "",
@@ -138,7 +153,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := s.loadDiagram()
+	result := s.loadDiagram(parseSketchParam(r))
 
 	tmpl, err := ui.ParseBaseTemplate()
 	if err != nil {
@@ -166,7 +181,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // handleAPIDiagram returns the parsed D2 result as JSON.
 func (s *Server) handleAPIDiagram(w http.ResponseWriter, r *http.Request) {
-	result := s.loadDiagram()
+	result := s.loadDiagram(parseSketchParam(r))
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to encode JSON: %v", err), http.StatusInternalServerError)
